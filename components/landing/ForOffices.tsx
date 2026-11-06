@@ -20,11 +20,11 @@ const CARDS = [
   {
     icon: HandCoins,
     title: 'Pay per signed lease',
-    text: 'No subscription to start. A placement fee only when a renter signs.',
+    text: 'Free during the pilot. After that, a flat fee only when a renter signs.',
   },
 ];
 
-export const PARTNER_EMAIL = 'partners@howzingg.example';
+export const PARTNER_EMAIL = 'Rajeev.Shrestha@usm.edu';
 
 export function ForOffices() {
   const [open, setOpen] = useState(false);
@@ -54,7 +54,7 @@ export function ForOffices() {
   );
 }
 
-function PartnerForm() {
+export function PartnerForm() {
   const submitLead = useMutationSafe();
   const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [error, setError] = useState('');

@@ -84,11 +84,17 @@ export function Footer() {
           <Link href="/app" className="hover:text-chalk">
             For students
           </Link>
-          <a href="#offices" className="hover:text-chalk">
+          <Link href="/offices" className="hover:text-chalk">
             For leasing offices
-          </a>
+          </Link>
+          <Link href="/faq" className="hover:text-chalk">
+            FAQ
+          </Link>
           <Link href="/privacy" className="hover:text-chalk">
             Privacy
+          </Link>
+          <Link href="/terms" className="hover:text-chalk">
+            Terms of use
           </Link>
           <Link href="/fair-housing" className="hover:text-chalk">
             Fair housing statement

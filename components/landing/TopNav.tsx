@@ -25,12 +25,12 @@ export function TopNav() {
           <a href="#how" className="hover:text-chalk">
             How it works
           </a>
-          <a href="#offices" className="hover:text-chalk">
+          <Link href="/offices" className="hover:text-chalk">
             For leasing offices
-          </a>
-          <a href="#faq" className="hover:text-chalk">
+          </Link>
+          <Link href="/faq" className="hover:text-chalk">
             FAQ
-          </a>
+          </Link>
         </div>
         <Link href="/app" className={buttonClass('secondary', 'ml-auto min-h-10 md:ml-0')}>
           Start my search
