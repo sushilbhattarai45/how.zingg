@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useRef, useSyncExternalStore } from 'react';
+import { createContext, useContext, useState, useSyncExternalStore } from 'react';
 import { createWorldStore, type WorldState, type WorldStore } from './store';
 
 const Ctx = createContext<WorldStore | null>(null);
@@ -13,9 +13,8 @@ export function WorldProvider({
   children: React.ReactNode;
   initial?: Partial<WorldState>;
 }) {
-  const ref = useRef<WorldStore | null>(null);
-  if (!ref.current) ref.current = createWorldStore(initial);
-  return <Ctx.Provider value={ref.current}>{children}</Ctx.Provider>;
+  const [store] = useState(() => createWorldStore(initial));
+  return <Ctx.Provider value={store}>{children}</Ctx.Provider>;
 }
 
 export function useWorldStore(): WorldStore {
