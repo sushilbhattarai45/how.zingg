@@ -1,6 +1,7 @@
 'use client';
 
-import { ConvexProvider, ConvexReactClient } from 'convex/react';
+import { ConvexAuthNextjsProvider } from '@convex-dev/auth/nextjs';
+import { ConvexReactClient } from 'convex/react';
 import { useState } from 'react';
 
 export function ConvexClientProvider({ children }: { children: React.ReactNode }) {
@@ -12,5 +13,5 @@ export function ConvexClientProvider({ children }: { children: React.ReactNode }
     // Without a Convex URL the static parts of the site still render; data views show their empty states.
     return <>{children}</>;
   }
-  return <ConvexProvider client={client}>{children}</ConvexProvider>;
+  return <ConvexAuthNextjsProvider client={client}>{children}</ConvexAuthNextjsProvider>;
 }

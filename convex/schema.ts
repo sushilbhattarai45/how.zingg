@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
+import { authTables } from '@convex-dev/auth/server';
 
 export const agentId = v.union(
   v.literal('concierge'),
@@ -17,24 +18,36 @@ const commute = v.object({
 });
 
 export default defineSchema({
+  // Auth tables (sessions, accounts, verification codes...) from Convex Auth.
+  ...authTables,
+  // One users table for auth and the student profile. Auth creates a user with only name/email/image,
+  // so profile fields are optional and filled in during onboarding.
   users: defineTable({
-    name: v.string(),
+    // Convex Auth fields
+    name: v.optional(v.string()),
+    image: v.optional(v.string()),
     email: v.optional(v.string()),
+    emailVerificationTime: v.optional(v.number()),
     phone: v.optional(v.string()),
+    phoneVerificationTime: v.optional(v.number()),
+    isAnonymous: v.optional(v.boolean()),
+    // Student profile
     whatsapp: v.optional(v.string()),
     homeCountry: v.optional(v.string()),
-    timeZone: v.string(),
-    universityId: v.id('universities'),
+    timeZone: v.optional(v.string()),
+    universityId: v.optional(v.id('universities')),
     campusBuildingId: v.optional(v.string()),
     arrivalDate: v.optional(v.string()), // ISO date (YYYY-MM-DD)
     budgetMin: v.optional(v.number()),
     budgetMax: v.optional(v.number()),
-    hasSSN: v.boolean(),
-    hasCar: v.boolean(),
-    roommatePref: v.union(v.literal('yes'), v.literal('maybe'), v.literal('no')),
-    onCouch: v.boolean(),
-    isDemo: v.boolean(),
+    hasSSN: v.optional(v.boolean()),
+    hasCar: v.optional(v.boolean()),
+    roommatePref: v.optional(v.union(v.literal('yes'), v.literal('maybe'), v.literal('no'))),
+    onCouch: v.optional(v.boolean()),
+    isDemo: v.optional(v.boolean()),
   })
+    .index('email', ['email'])
+    .index('phone', ['phone'])
     .index('by_university', ['universityId'])
     .index('by_isDemo', ['isDemo']),
 
