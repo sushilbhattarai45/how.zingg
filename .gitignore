@@ -1,0 +1,14 @@
+node_modules/
+.next/
+out/
+coverage/
+playwright-report/
+test-results/
+tests/screens/
+.env
+.env.*
+!.env.example
+.convex/
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store

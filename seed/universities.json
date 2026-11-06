@@ -1,0 +1,47 @@
+[
+  {
+    "name": "University of Southern Mississippi",
+    "shortName": "USM",
+    "city": "Hattiesburg",
+    "state": "MS",
+    "lat": 31.3289,
+    "lng": -89.3348,
+    "timeZone": "America/Chicago",
+    "ready": true,
+    "buildings": [
+      { "id": "scianna", "name": "Scianna Hall", "lat": 31.3297, "lng": -89.3337 },
+      { "id": "cook", "name": "Cook Library", "lat": 31.329, "lng": -89.3334 },
+      { "id": "cochran", "name": "Thad Cochran Center", "lat": 31.3283, "lng": -89.333 }
+    ]
+  },
+  {
+    "name": "Mississippi State University",
+    "shortName": "MSU",
+    "city": "Starkville",
+    "state": "MS",
+    "lat": 33.4552,
+    "lng": -88.7944,
+    "timeZone": "America/Chicago",
+    "ready": false,
+    "buildings": [
+      { "id": "lee", "name": "Lee Hall", "lat": 33.4561, "lng": -88.7929 },
+      { "id": "mitchell", "name": "Mitchell Memorial Library", "lat": 33.4542, "lng": -88.7951 },
+      { "id": "colvard", "name": "Colvard Student Union", "lat": 33.4546, "lng": -88.7894 }
+    ]
+  },
+  {
+    "name": "University of Mississippi",
+    "shortName": "Ole Miss",
+    "city": "Oxford",
+    "state": "MS",
+    "lat": 34.365,
+    "lng": -89.538,
+    "timeZone": "America/Chicago",
+    "ready": false,
+    "buildings": [
+      { "id": "lyceum", "name": "The Lyceum", "lat": 34.3653, "lng": -89.5383 },
+      { "id": "jdwilliams", "name": "J.D. Williams Library", "lat": 34.3647, "lng": -89.5368 },
+      { "id": "union", "name": "Student Union", "lat": 34.3632, "lng": -89.5376 }
+    ]
+  }
+]

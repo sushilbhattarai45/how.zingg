@@ -1,0 +1,134 @@
+[
+  {
+    "id": "walmart",
+    "group": "Stores",
+    "title": "Walmart Supercenter",
+    "keywords": ["walmart", "store", "supercenter", "groceries"],
+    "distanceMi": 2.6,
+    "travel": { "walkMin": 52, "transitMin": 18, "driveMin": 9 },
+    "hours": "6:00 AM–11:00 PM",
+    "fact": "Groceries, bedding, kitchen basics, phone SIMs",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=Walmart+Supercenter+Hattiesburg+MS"
+  },
+  {
+    "id": "target",
+    "group": "Stores",
+    "title": "Target",
+    "keywords": ["target", "store"],
+    "distanceMi": 4.1,
+    "travel": { "transitMin": 26, "driveMin": 11 },
+    "hours": "8:00 AM–10:00 PM",
+    "fact": "Home goods and groceries",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=Target+Hattiesburg+MS"
+  },
+  {
+    "id": "kroger",
+    "group": "Groceries",
+    "title": "Kroger",
+    "keywords": ["kroger", "grocery", "groceries", "food"],
+    "distanceMi": 1.8,
+    "travel": { "walkMin": 36, "transitMin": 14, "driveMin": 6 },
+    "hours": "6:00 AM–11:00 PM",
+    "fact": "Full grocery store with pharmacy",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=Kroger+Hattiesburg+MS"
+  },
+  {
+    "id": "asian-market",
+    "group": "Groceries",
+    "title": "Asian Market (example)",
+    "keywords": ["asian", "nepali", "grocery", "groceries", "indian", "rice", "spices"],
+    "distanceMi": 1.4,
+    "travel": { "walkMin": 28, "transitMin": 12, "driveMin": 5 },
+    "hours": "10:00 AM–8:00 PM",
+    "fact": "Nepali and South Asian staples, rice, lentils, spices",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=Asian+grocery+Hattiesburg+MS"
+  },
+  {
+    "id": "indian-grocery",
+    "group": "Groceries",
+    "title": "Indian grocery (example)",
+    "keywords": ["indian", "grocery", "groceries", "halal", "spices", "nepali"],
+    "distanceMi": 2.1,
+    "travel": { "walkMin": 42, "transitMin": 19, "driveMin": 8 },
+    "hours": "10:00 AM–9:00 PM",
+    "fact": "Indian groceries, frozen food, some halal meat",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=Indian+grocery+Hattiesburg+MS"
+  },
+  {
+    "id": "amazon-locker",
+    "group": "Other",
+    "title": "Amazon Locker (example location)",
+    "keywords": ["amazon", "locker", "delivery", "package"],
+    "distanceMi": 0.9,
+    "travel": { "walkMin": 18, "transitMin": 9, "driveMin": 4 },
+    "hours": "Open 24 hours",
+    "fact": "Pick up packages if your building has no front desk",
+    "sourceUrl": "https://www.amazon.com/ulp"
+  },
+  {
+    "id": "bank-1",
+    "group": "Banks",
+    "title": "Regions Bank",
+    "keywords": ["bank", "account", "ssn", "money"],
+    "distanceMi": 0.8,
+    "travel": { "walkMin": 16, "transitMin": 8, "driveMin": 3 },
+    "hours": "9:00 AM–5:00 PM",
+    "fact": "Ask about opening an account with a passport and I-20; confirm with the bank",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=Regions+Bank+Hattiesburg+MS"
+  },
+  {
+    "id": "bank-2",
+    "group": "Banks",
+    "title": "Trustmark Bank",
+    "keywords": ["bank", "account", "ssn", "money"],
+    "distanceMi": 1.2,
+    "travel": { "walkMin": 24, "transitMin": 11, "driveMin": 4 },
+    "hours": "9:00 AM–5:00 PM",
+    "fact": "Ask which IDs they accept without an SSN; confirm with the bank",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=Trustmark+Bank+Hattiesburg+MS"
+  },
+  {
+    "id": "bank-3",
+    "group": "Banks",
+    "title": "Chase Bank",
+    "keywords": ["bank", "account", "ssn", "money"],
+    "distanceMi": 2.3,
+    "travel": { "transitMin": 17, "driveMin": 7 },
+    "hours": "9:00 AM–5:00 PM",
+    "fact": "Has student accounts; ask about non-SSN documents; confirm with the bank",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=Chase+Bank+Hattiesburg+MS"
+  },
+  {
+    "id": "pharmacy",
+    "group": "Other",
+    "title": "Walgreens Pharmacy",
+    "keywords": ["pharmacy", "medicine", "walgreens"],
+    "distanceMi": 1.1,
+    "travel": { "walkMin": 22, "transitMin": 10, "driveMin": 4 },
+    "hours": "8:00 AM–10:00 PM",
+    "fact": "Pharmacy and basics",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=Walgreens+Hattiesburg+MS"
+  },
+  {
+    "id": "laundromat",
+    "group": "Other",
+    "title": "Laundromat (example)",
+    "keywords": ["laundry", "laundromat", "wash"],
+    "distanceMi": 0.7,
+    "travel": { "walkMin": 14, "driveMin": 3 },
+    "hours": "7:00 AM–10:00 PM",
+    "fact": "Coin and card machines",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=laundromat+Hattiesburg+MS"
+  },
+  {
+    "id": "bus",
+    "group": "Transit",
+    "title": "Hub City Transit",
+    "keywords": ["bus", "transit", "route", "public transport"],
+    "distanceMi": 0.3,
+    "travel": { "walkMin": 6 },
+    "hours": "Weekdays; check the schedule",
+    "fact": "City bus routes and schedules",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=Hub+City+Transit+Hattiesburg"
+  }
+]

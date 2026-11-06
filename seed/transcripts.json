@@ -1,0 +1,35 @@
+{
+  "oak-hollow-1bd": {
+    "lines": [
+      {
+        "speaker": "caller",
+        "text": "Hi, I'm an AI assistant calling on behalf of a student, Asha, who's moving to the University of Southern Mississippi. This call is recorded. Do you have a minute?"
+      },
+      { "speaker": "office", "text": "Sure. How can I help?" },
+      { "speaker": "caller", "text": "Is your 1 bed available for move-in on August 14?" },
+      { "speaker": "office", "text": "Yes, we have one opening up on the 14th." },
+      { "speaker": "caller", "text": "What's the monthly rent, and the deposit and fees?" },
+      { "speaker": "office", "text": "$650 a month, $300 deposit, and a $50 admin fee." },
+      {
+        "speaker": "caller",
+        "text": "She's an international student without an SSN. What do you accept instead, for example an I-20, funding letter, or a guarantor?"
+      },
+      { "speaker": "office", "text": "An I-20 and a funding letter work for us. No guarantor needed." },
+      { "speaker": "caller", "text": "Any current specials?" },
+      { "speaker": "office", "text": "Not right now, but we can talk about the admin fee." },
+      { "speaker": "caller", "text": "Can we send you her renter packet? What email should we use?" },
+      { "speaker": "office", "text": "Send it to leasing@oakhollow.example." },
+      { "speaker": "caller", "text": "Thank you so much. We'll follow up by email." }
+    ],
+    "answers": {
+      "available": true,
+      "availableDate": "2027-08-14",
+      "rent": 650,
+      "deposit": 300,
+      "fees": "$50 admin fee",
+      "noSSNOptions": "I-20 + funding letter",
+      "specials": "None; open to discussing the admin fee",
+      "packetEmail": "leasing@oakhollow.example"
+    }
+  }
+}

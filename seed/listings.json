@@ -1,0 +1,183 @@
+{
+  "offices": [
+    {
+      "key": "oak",
+      "name": "Oak Hollow Leasing",
+      "phone": "+16019132221",
+      "email": "leasing@oakhollow.example",
+      "website": "https://oakhollow.example",
+      "hours": "mon-fri 08:00-17:00",
+      "acceptsNoSSN": true,
+      "partner": true,
+      "callAllowed": true
+    },
+    {
+      "key": "pine",
+      "name": "Pine Row Leasing",
+      "phone": "+16015550142",
+      "email": "office@pinerow.example",
+      "website": "https://pinerow.example",
+      "hours": "thu-sat 09:00-17:00",
+      "acceptsNoSSN": false,
+      "partner": false,
+      "callAllowed": false
+    },
+    {
+      "key": "magnolia",
+      "name": "Magnolia Court Leasing",
+      "email": "hello@magnoliacourt.example",
+      "website": "https://magnoliacourt.example",
+      "hours": "mon-fri 09:00-18:00",
+      "acceptsNoSSN": false,
+      "partner": false,
+      "callAllowed": false
+    },
+    {
+      "key": "willow",
+      "name": "Willow Park Leasing",
+      "phone": "+16015550177",
+      "email": "lease@willowpark.example",
+      "website": "https://willowpark.example",
+      "hours": "mon-sat 09:00-17:00",
+      "partner": false,
+      "callAllowed": false
+    },
+    {
+      "key": "cedar",
+      "name": "Cedar Flats Leasing",
+      "email": "rooms@cedarflats.example",
+      "website": "https://cedarflats.example",
+      "hours": "mon-fri 10:00-16:00",
+      "partner": false,
+      "callAllowed": false
+    },
+    {
+      "key": "birch",
+      "name": "Birch Lane Leasing",
+      "email": "office@birchlane.example",
+      "website": "https://birchlane.example",
+      "hours": "mon-fri 09:00-17:00",
+      "partner": false,
+      "callAllowed": false
+    },
+    {
+      "key": "sunny",
+      "name": "Sunny Rentals",
+      "email": "sunnyrentals350@mail.example",
+      "hours": "",
+      "partner": false,
+      "callAllowed": false
+    }
+  ],
+  "listings": [
+    {
+      "slug": "oak-hollow-1bd",
+      "office": "oak",
+      "title": "Oak Hollow",
+      "unitType": "1 bed",
+      "rent": 650,
+      "deposit": 300,
+      "fees": 50,
+      "availableFrom": "2027-08-14",
+      "furnished": false,
+      "roommateShare": false,
+      "noSSN": "ok",
+      "noSSNNote": "Accepts I-20 + funding letter",
+      "commute": { "scianna": { "walkMin": 9, "bikeMin": 4, "transitMin": 7, "driveMin": 3 } },
+      "scamFlags": [],
+      "sourceUrl": "https://oakhollow.example/1-bed"
+    },
+    {
+      "slug": "pine-row-1bd",
+      "office": "pine",
+      "title": "Pine Row",
+      "unitType": "1 bed",
+      "rent": 640,
+      "deposit": 400,
+      "availableFrom": "2027-08-01",
+      "furnished": false,
+      "roommateShare": false,
+      "noSSN": "guarantor",
+      "noSSNNote": "Guarantor or 2 months deposit",
+      "commute": { "scianna": { "walkMin": 28, "bikeMin": 12, "transitMin": 16, "driveMin": 6 } },
+      "scamFlags": [],
+      "sourceUrl": "https://pinerow.example/floorplans"
+    },
+    {
+      "slug": "magnolia-court-studio",
+      "office": "magnolia",
+      "title": "Magnolia Court",
+      "unitType": "Studio",
+      "rent": 720,
+      "deposit": 500,
+      "availableFrom": "2027-08-10",
+      "furnished": true,
+      "roommateShare": false,
+      "noSSN": "guarantor",
+      "noSSNNote": "Guarantor needed",
+      "commute": { "scianna": { "walkMin": 6, "bikeMin": 3, "transitMin": 6, "driveMin": 2 } },
+      "scamFlags": [],
+      "sourceUrl": "https://magnoliacourt.example/studios"
+    },
+    {
+      "slug": "willow-park-1bd",
+      "office": "willow",
+      "title": "Willow Park",
+      "unitType": "1 bed",
+      "rent": 590,
+      "deposit": 350,
+      "availableFrom": "2027-08-05",
+      "furnished": false,
+      "roommateShare": false,
+      "noSSN": "unknown",
+      "commute": { "scianna": { "walkMin": 14, "bikeMin": 6, "transitMin": 11, "driveMin": 4 } },
+      "scamFlags": [],
+      "sourceUrl": "https://willowpark.example/units"
+    },
+    {
+      "slug": "cedar-flats-room",
+      "office": "cedar",
+      "title": "Cedar Flats",
+      "unitType": "Room in 2 bed",
+      "rent": 410,
+      "deposit": 200,
+      "availableFrom": "2027-08-10",
+      "furnished": true,
+      "roommateShare": true,
+      "noSSN": "unknown",
+      "commute": { "scianna": { "walkMin": 17, "bikeMin": 7, "transitMin": 12, "driveMin": 5 } },
+      "scamFlags": [],
+      "sourceUrl": "https://cedarflats.example/rooms"
+    },
+    {
+      "slug": "birch-lane-1bd",
+      "office": "birch",
+      "title": "Birch Lane",
+      "unitType": "1 bed",
+      "rent": 780,
+      "deposit": 400,
+      "availableFrom": "2027-08-01",
+      "furnished": false,
+      "roommateShare": false,
+      "noSSN": "unknown",
+      "commute": { "scianna": { "walkMin": 45, "bikeMin": 16, "transitMin": 18, "driveMin": 9 } },
+      "scamFlags": [],
+      "sourceUrl": "https://birchlane.example"
+    },
+    {
+      "slug": "sunny-1bd-scam",
+      "office": "sunny",
+      "title": "Sunny 1 bed",
+      "unitType": "1 bed",
+      "rent": 350,
+      "availableFrom": "2027-08-01",
+      "furnished": true,
+      "roommateShare": false,
+      "noSSN": "unknown",
+      "description": "Wire the deposit today to hold it. Owner is overseas, no tours.",
+      "commute": { "scianna": { "walkMin": 10, "bikeMin": 4, "transitMin": 8, "driveMin": 3 } },
+      "scamFlags": ["wire_transfer", "below_market"],
+      "sourceUrl": "https://classifieds.example/sunny-1bd"
+    }
+  ]
+}

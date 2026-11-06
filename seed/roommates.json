@@ -1,0 +1,42 @@
+[
+  {
+    "name": "Aarav",
+    "program": "MS Computer Science",
+    "budgetMin": 350,
+    "budgetMax": 450,
+    "moveIn": "2027-08-10",
+    "tags": ["Early riser", "Cooks", "No smoking"]
+  },
+  {
+    "name": "Mariana",
+    "program": "PhD Marine Science",
+    "budgetMin": 400,
+    "budgetMax": 500,
+    "moveIn": "2027-08-18",
+    "tags": ["Quiet", "Night owl", "Has a car"]
+  },
+  {
+    "name": "Tunde",
+    "program": "Transfer, Business",
+    "budgetMin": 300,
+    "budgetMax": 400,
+    "moveIn": "2028-01-06",
+    "tags": ["Tidy", "Gym"]
+  },
+  {
+    "name": "Priya",
+    "program": "PhD Chemistry",
+    "budgetMin": 400,
+    "budgetMax": 550,
+    "moveIn": "2027-08-12",
+    "tags": ["Vegetarian", "Night owl"]
+  },
+  {
+    "name": "Sam",
+    "program": "Transfer, Nursing",
+    "budgetMin": 350,
+    "budgetMax": 450,
+    "moveIn": "2028-01-03",
+    "tags": ["Early shifts", "Has a car"]
+  }
+]
