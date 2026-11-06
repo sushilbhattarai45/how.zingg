@@ -173,3 +173,18 @@ dialog.sheet[open] {
     opacity: 0;
   }
 }
+
+/* Light surfaces: paper cards with ink text. Re-points the dark tokens inside this scope. */
+.theme-light {
+  --chalk: #191719;
+  --text-2: #5e5a5f;
+  --text-3: #6f6b70;
+  --surface: #ffffff;
+  --raised: #efebe4;
+  --line: #e3dfd9;
+  --good: #3f7a08;
+  --window-dim: #e6f2d8;
+  --bad: #b3261e;
+  --wait: #8a5a00;
+  color: var(--chalk);
+}

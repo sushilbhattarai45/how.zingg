@@ -3,6 +3,7 @@
  * Per-frame values are read in useFrame without re-rendering; UI subscribes for coarse changes.
  */
 import type { CameraPose, FocusTarget } from './cameraRig';
+import type { ClipName } from './navGraph';
 
 export type BotId = 'concierge' | 'scout' | 'caller' | 'packet' | 'closer';
 export const BOT_IDS: BotId[] = ['concierge', 'scout', 'caller', 'packet', 'closer'];
@@ -33,6 +34,9 @@ export type WorldState = {
   paused: boolean;
 };
 
+/** Where a bot should be and what it should do. Written by a director every frame, read by <Bot>. */
+export type BotDrive = { x: number; z: number; face: number; clip: ClipName; showRole: boolean };
+
 type Listener = () => void;
 
 export function createWorldStore(initial: Partial<WorldState> = {}) {
@@ -50,10 +54,14 @@ export function createWorldStore(initial: Partial<WorldState> = {}) {
     paused: false,
     ...initial,
   };
+  const drive = Object.fromEntries(
+    BOT_IDS.map((id, i) => [id, { x: 14.6 + i, z: 9.8, face: 0.6, clip: 'idle', showRole: false }]),
+  ) as Record<BotId, BotDrive>;
   const listeners = new Set<Listener>();
   const pickListeners = new Set<(hit: PickHit) => void>();
 
   return {
+    drive,
     get: () => state,
     set(patch: Partial<WorldState>) {
       state = { ...state, ...patch };

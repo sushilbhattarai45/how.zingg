@@ -100,7 +100,6 @@ export function CameraRig() {
         instant = true;
       } else {
         desired = poseAt(s.scrollProgress);
-        instant = true; // scroll already smooths; follow exactly so scrubbing feels direct
       }
     } else {
       if (s.focus !== lastFocus.current) {
@@ -121,7 +120,8 @@ export function CameraRig() {
     if (!current.current || (instant && !s.scriptedPose)) {
       current.current = desired;
     } else {
-      const k = s.reducedMotion ? 1 : 1 - Math.exp(-dt * 4);
+      // Critically-damped-ish easing: smooth glide, no overshoot or bounce.
+      const k = s.reducedMotion ? 1 : 1 - Math.exp(-dt * (s.mode === 'landing' ? 2.6 : 4));
       current.current = lerpPose(current.current, desired, k);
     }
 

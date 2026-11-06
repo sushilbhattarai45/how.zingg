@@ -226,7 +226,7 @@ function SubBeat({
       {/* Mobile: the card sits below the 58svh world and scrolls with the page. Desktop: sticky on the left. */}
       <motion.div
         style={{ opacity, y }}
-        className="pointer-events-auto relative mx-4 max-w-[440px] rounded-[20px] border border-line bg-surface/[.88] p-6 backdrop-blur-sm md:sticky md:top-[max(96px,calc(50svh-220px))] md:ml-[6vw]"
+        className="theme-light pointer-events-auto relative mx-4 max-w-[440px] rounded-[20px] bg-paper/95 p-6 shadow-[0_12px_40px_rgba(17,16,18,.35)] backdrop-blur-md md:sticky md:top-[max(96px,calc(50svh-220px))] md:ml-[6vw]"
       >
         {children}
       </motion.div>

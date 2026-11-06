@@ -9,6 +9,9 @@ import { Outdoors } from './Outdoors';
 import { Apartment } from './Apartment';
 import { LeasingOffice } from './LeasingOffice';
 import { WindowDriver } from './LitWindows';
+import { Bot } from './Bot';
+import { AppDirector, LandingDirector } from './directors';
+import { AGENTS } from '@/content/agents';
 import { detectQuality, hasWebGL, prefersReducedMotion } from './quality';
 import type { BotId, PickHit, SceneName, WindowTarget, WorldMode } from './store';
 import type { FocusTarget } from './cameraRig';
@@ -115,6 +118,10 @@ export function World({
               <Outdoors quality={env.quality} />
               <Apartment quality={env.quality} />
               <LeasingOffice />
+              {mode === 'landing' ? <LandingDirector /> : <AppDirector />}
+              {AGENTS.map((a) => (
+                <Bot key={a.id} id={a.id} name={a.name} color={a.color} />
+              ))}
             </Canvas>
           )}
     </div>

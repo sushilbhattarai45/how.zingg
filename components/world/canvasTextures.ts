@@ -125,3 +125,51 @@ export function luggageTagTexture(text = 'KTM→PIB') {
     ctx.fillText(text, 128, 64);
   });
 }
+
+/** Chalk pill name tag with a colored dot. Returns the texture and its aspect (w/h). */
+export function nameTagTexture(name: string, color: string) {
+  const key = `tag:${name}:${color}`;
+  const hit = cache.get(key);
+  if (hit)
+    return {
+      tex: hit,
+      aspect: (hit.image as HTMLCanvasElement).width / (hit.image as HTMLCanvasElement).height,
+    };
+  const scale = 4;
+  const h = 26 * scale;
+  const measure = document.createElement('canvas').getContext('2d')!;
+  measure.font = `800 ${14 * scale}px ${FONT}`;
+  const textW = measure.measureText(name).width;
+  const w = Math.ceil(textW + 40 * scale);
+  const tex = make(key, w, h, (ctx) => drawTag(ctx, w, h, scale, name, color));
+  // Redraw once web fonts are ready so the tag uses Nunito.
+  document.fonts?.ready.then(() => {
+    const c = tex.image as HTMLCanvasElement;
+    drawTag(c.getContext('2d')!, c.width, c.height, scale, name, color);
+    tex.needsUpdate = true;
+  });
+  return { tex, aspect: w / h };
+}
+
+function drawTag(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  scale: number,
+  name: string,
+  color: string,
+) {
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#f7f5f0';
+  ctx.beginPath();
+  ctx.roundRect(0, 0, w, h, h / 2);
+  ctx.fill();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(13 * scale, h / 2, 4.5 * scale, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#191719';
+  ctx.font = `800 ${14 * scale}px ${FONT}`;
+  ctx.textBaseline = 'middle';
+  ctx.fillText(name, 24 * scale, h / 2 + scale);
+}

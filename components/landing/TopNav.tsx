@@ -15,7 +15,7 @@ export function TopNav() {
   }, []);
   return (
     <header
-      className={`fixed inset-x-0 top-0 z-40 transition-colors duration-250 ${solid ? 'border-b border-line bg-ink/95 backdrop-blur' : 'bg-transparent'}`}
+      className={`fixed inset-x-0 top-0 z-40 transition-colors duration-250 ${solid ? 'border-b border-line bg-ink/95 backdrop-blur' : 'bg-ink/55 backdrop-blur-md'}`}
     >
       <nav className="mx-auto flex h-16 max-w-6xl items-center gap-6 px-4" aria-label="Main">
         <Link href="/" aria-label="how.zingg home" className="shrink-0">

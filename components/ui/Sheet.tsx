@@ -47,7 +47,7 @@ export function Sheet({
         if (e.target === ref.current) onClose();
       }}
       aria-label={title}
-      className="sheet m-0 mt-auto max-h-[88vh] w-full max-w-none rounded-t-[20px] border border-line bg-surface p-0 text-chalk shadow-[var(--shadow-float)] backdrop:bg-black/60 md:m-auto md:max-h-[80vh] md:rounded-[20px]"
+      className="sheet theme-light m-0 mt-auto max-h-[88vh] w-full max-w-none rounded-t-[20px] border border-line bg-paper p-0 text-chalk shadow-[var(--shadow-float)] backdrop:bg-black/60 md:m-auto md:max-h-[80vh] md:rounded-[20px]"
       style={{ ['--sheet-w' as string]: `${width}px` }}
     >
       {open && (

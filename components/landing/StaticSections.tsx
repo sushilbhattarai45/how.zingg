@@ -57,7 +57,7 @@ export function FinalCta() {
   return (
     <section className="mx-auto max-w-6xl px-4 py-16">
       <div className="flex flex-col items-center gap-5 rounded-[20px] border border-line bg-surface px-6 py-10 text-center md:flex-row md:text-left">
-        <Image src="/brand/mark-dark.svg" alt="" width={64} height={58} />
+        <Image src="/brand/mark-light.svg" alt="" width={64} height={58} />
         <p className="flex-1 text-[22px] leading-7 font-extrabold">
           The light&apos;s on. Let&apos;s find your home.
         </p>

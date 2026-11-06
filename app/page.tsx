@@ -9,10 +9,12 @@ export default function LandingPage() {
       <TopNav />
       <main>
         <StoryScroller />
-        <ForOffices />
-        <Facts />
-        <Faq />
-        <FinalCta />
+        <div className="theme-light bg-paper">
+          <ForOffices />
+          <Facts />
+          <Faq />
+          <FinalCta />
+        </div>
       </main>
       <Footer />
     </>
