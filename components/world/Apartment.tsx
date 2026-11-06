@@ -10,7 +10,13 @@ import { WallWindow } from './LitWindows';
 import { useWorldStore } from './WorldContext';
 import { isTap } from './pick';
 import { INNER_WALL_H, WALL_H } from './layout';
-import { mapTexture, whiteboardTexture, waveformTexture, drawWaveform, luggageTagTexture } from './canvasTextures';
+import {
+  mapTexture,
+  whiteboardTexture,
+  waveformTexture,
+  drawWaveform,
+  luggageTagTexture,
+} from './canvasTextures';
 
 const T = 0.2; // wall thickness
 
@@ -126,11 +132,24 @@ function Plant({ p, scale = 1 }: { p: [number, number, number]; scale?: number }
   );
 }
 
-function Lamp({ p, height = 0.5, glow = '#ffd9a0' }: { p: [number, number, number]; height?: number; glow?: string }) {
+function Lamp({
+  p,
+  height = 0.5,
+  glow = '#ffd9a0',
+}: {
+  p: [number, number, number];
+  height?: number;
+  glow?: string;
+}) {
   return (
     <group position={p}>
       <Cyl p={[0, height / 2, 0]} s={[0.03, height, 0.03]} color={PALETTE.metal} />
-      <mesh geometry={GEO.cone} material={basic(glow)} position={[0, height + 0.1, 0]} scale={[0.18, 0.22, 0.18]} />
+      <mesh
+        geometry={GEO.cone}
+        material={basic(glow)}
+        position={[0, height + 0.1, 0]}
+        scale={[0.18, 0.22, 0.18]}
+      />
     </group>
   );
 }
@@ -224,7 +243,13 @@ function Bedroom({ quality }: { quality: 'high' | 'low' }) {
       />
       {/* Suitcase with luggage tag (Closer carries it) */}
       <group position={[-4.2, 0, 5.8]}>
-        <RoundedBox args={[0.5, 0.7, 0.28]} radius={0.06} position={[0, 0.37, 0]} material={mat('#f25c8a')} castShadow />
+        <RoundedBox
+          args={[0.5, 0.7, 0.28]}
+          radius={0.06}
+          position={[0, 0.37, 0]}
+          material={mat('#f25c8a')}
+          castShadow
+        />
         <mesh geometry={GEO.plane} position={[0, 0.5, 0.15]} scale={[0.3, 0.11, 1]}>
           <meshStandardMaterial map={tag} />
         </mesh>
@@ -366,23 +391,65 @@ function Living({ quality }: { quality: 'high' | 'low' }) {
         onPointerOver={() => hoverCursor(true)}
         onPointerOut={() => hoverCursor(false)}
       >
-        <RoundedBox args={[2.8, 0.45, 1.0]} radius={0.12} position={[0, 0.3, 0]} material={mat(PALETTE.sofa)} castShadow receiveShadow />
-        <RoundedBox args={[2.8, 0.6, 0.3]} radius={0.12} position={[0, 0.75, -0.4]} material={mat(PALETTE.sofaDark)} castShadow />
-        <RoundedBox args={[0.28, 0.35, 1.0]} radius={0.1} position={[-1.3, 0.65, 0]} material={mat(PALETTE.sofaDark)} castShadow />
-        <RoundedBox args={[0.28, 0.35, 1.0]} radius={0.1} position={[1.3, 0.65, 0]} material={mat(PALETTE.sofaDark)} castShadow />
+        <RoundedBox
+          args={[2.8, 0.45, 1.0]}
+          radius={0.12}
+          position={[0, 0.3, 0]}
+          material={mat(PALETTE.sofa)}
+          castShadow
+          receiveShadow
+        />
+        <RoundedBox
+          args={[2.8, 0.6, 0.3]}
+          radius={0.12}
+          position={[0, 0.75, -0.4]}
+          material={mat(PALETTE.sofaDark)}
+          castShadow
+        />
+        <RoundedBox
+          args={[0.28, 0.35, 1.0]}
+          radius={0.1}
+          position={[-1.3, 0.65, 0]}
+          material={mat(PALETTE.sofaDark)}
+          castShadow
+        />
+        <RoundedBox
+          args={[0.28, 0.35, 1.0]}
+          radius={0.1}
+          position={[1.3, 0.65, 0]}
+          material={mat(PALETTE.sofaDark)}
+          castShadow
+        />
       </group>
       {/* Coffee table */}
       <Block p={[6, 0.38, 2.9]} s={[1.3, 0.06, 0.8]} color={PALETTE.wood} />
       <Block p={[6, 0, 2.9]} s={[1.1, 0.38, 0.6]} color={PALETTE.woodDark} />
       {/* Armchair */}
       <group position={[8.6, 0, 3.4]} rotation={[0, -1.2, 0]}>
-        <RoundedBox args={[0.9, 0.45, 0.9]} radius={0.1} position={[0, 0.3, 0]} material={mat(PALETTE.armchair)} castShadow />
-        <RoundedBox args={[0.9, 0.55, 0.22]} radius={0.08} position={[0, 0.7, -0.35]} material={mat(PALETTE.armchair)} castShadow />
+        <RoundedBox
+          args={[0.9, 0.45, 0.9]}
+          radius={0.1}
+          position={[0, 0.3, 0]}
+          material={mat(PALETTE.armchair)}
+          castShadow
+        />
+        <RoundedBox
+          args={[0.9, 0.55, 0.22]}
+          radius={0.08}
+          position={[0, 0.7, -0.35]}
+          material={mat(PALETTE.armchair)}
+          castShadow
+        />
       </group>
       {/* Floor lamp, big plant */}
       <group position={[8.1, 0, 0.6]}>
         <Cyl p={[0, 0.85, 0]} s={[0.03, 1.7, 0.03]} color={PALETTE.metal} />
-        <mesh geometry={GEO.cone} material={basic('#ffd9a0')} position={[0, 1.8, 0]} scale={[0.28, 0.3, 0.28]} />
+        <mesh
+          geometry={GEO.cone}
+          material={basic('#ffd9a0')}
+          position={[0, 1.8, 0]}
+          scale={[0.28, 0.3, 0.28]}
+        />
       </group>
       <Plant p={[9.4, 0, 6.4]} scale={1.4} />
       {quality === 'high' && <Plant p={[3.6, 0, 0.4]} scale={0.8} />}

@@ -100,7 +100,11 @@ export function World({
               dpr={env.quality === 'high' ? [1, 2] : [1, 1.5]}
               frameloop={paused ? 'never' : 'always'}
               camera={{ position: [30, 30, 30], zoom: 20, near: 0.1, far: 400 }}
-              gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, outputColorSpace: THREE.SRGBColorSpace }}
+              gl={{
+                antialias: true,
+                toneMapping: THREE.ACESFilmicToneMapping,
+                outputColorSpace: THREE.SRGBColorSpace,
+              }}
               style={{ touchAction: mode === 'app' ? 'none' : 'auto' }}
             >
               <color attach="background" args={[SKY]} />

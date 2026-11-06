@@ -33,6 +33,7 @@ export function CameraRig() {
   const current = useRef<CameraPose | null>(null);
   const orbit = useRef({ az: 0, el: 0, zoom: 1 });
   const lastFocus = useRef(store.get().focus);
+  const offset = useRef(0);
 
   // App mode: drag to orbit, wheel/pinch to zoom.
   useEffect(() => {
@@ -128,6 +129,13 @@ export function CameraRig() {
     const [x, y, z] = cameraPosition(pose, DISTANCE);
     camera.position.set(x, y, z);
     camera.lookAt(pose.target[0], pose.target[1], pose.target[2]);
+    // Landing on desktop: the beat panel sits on the left, so shift the world right.
+    const shift = s.mode === 'landing' && size.width >= 768 ? Math.round(size.width * 0.16) : 0;
+    if (shift !== offset.current) {
+      if (shift) camera.setViewOffset(size.width, size.height, -shift, 0, size.width, size.height);
+      else camera.clearViewOffset();
+      offset.current = shift;
+    }
     const zoom = baseFit(size.width, size.height) * pose.zoom;
     if (Math.abs(camera.zoom - zoom) > 1e-4) {
       camera.zoom = zoom;

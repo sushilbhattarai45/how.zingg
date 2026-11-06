@@ -48,7 +48,9 @@ export function WorldPreview() {
             {lit ? 'Lights off' : 'Lights on'}
           </button>
         </div>
-        {last && <p className="absolute bottom-3 left-3 rounded-xl bg-surface px-3 py-2 text-sm">Picked {last}</p>}
+        {last && (
+          <p className="absolute bottom-3 left-3 rounded-xl bg-surface px-3 py-2 text-sm">Picked {last}</p>
+        )}
       </main>
     </WorldProvider>
   );

@@ -11,18 +11,18 @@ export type CameraPose = {
 
 export type Keyframe = CameraPose & { at: number };
 
-/** Landing keyframes (BUILD_PROMPT §7.2). */
+/** Landing keyframes (BUILD_PROMPT §7.2). Close-up zooms are ~0.7× the spec's values to suit our base fit. */
 export const LANDING_KEYFRAMES: Keyframe[] = [
   { at: 0.0, target: [4, 0.9, 3], azimuth: 45, elevation: 52, zoom: 0.85 },
   { at: 0.12, target: [2, 0.9, 2], azimuth: 40, elevation: 44, zoom: 1.0 },
-  { at: 0.22, target: [15, 0.6, 8], azimuth: 35, elevation: 34, zoom: 2.1 },
-  { at: 0.38, target: [16.5, 1.0, 8.5], azimuth: 30, elevation: 30, zoom: 2.6 },
-  { at: 0.5, target: [8, 0.6, 9], azimuth: 40, elevation: 38, zoom: 1.5 },
-  { at: 0.64, target: [-6.5, 0.9, -3.5], azimuth: 45, elevation: 42, zoom: 2.2 },
-  { at: 0.7, target: [-1, 0.9, 1], azimuth: 45, elevation: 42, zoom: 2.2 },
-  { at: 0.76, target: [4, 0.9, -4.5], azimuth: 45, elevation: 42, zoom: 2.2 },
-  { at: 0.82, target: [6, 0.9, 2.5], azimuth: 45, elevation: 40, zoom: 2.1 },
-  { at: 0.9, target: [-1, 0.9, -5], azimuth: 45, elevation: 40, zoom: 2.0 },
+  { at: 0.22, target: [16, 0.8, 8], azimuth: 35, elevation: 34, zoom: 1.45 },
+  { at: 0.38, target: [16.5, 1.0, 8], azimuth: 30, elevation: 30, zoom: 1.8 },
+  { at: 0.5, target: [8, 0.6, 9], azimuth: 40, elevation: 38, zoom: 1.1 },
+  { at: 0.64, target: [-6.5, 0.9, -3.5], azimuth: 45, elevation: 42, zoom: 1.6 },
+  { at: 0.7, target: [-1, 0.9, 1], azimuth: 45, elevation: 42, zoom: 1.6 },
+  { at: 0.76, target: [4, 0.9, -4.5], azimuth: 45, elevation: 42, zoom: 1.6 },
+  { at: 0.82, target: [6, 0.9, 2.5], azimuth: 45, elevation: 40, zoom: 1.5 },
+  { at: 0.9, target: [-1, 0.9, -5], azimuth: 45, elevation: 40, zoom: 1.5 },
   { at: 1.0, target: [4, 0.9, 3], azimuth: 45, elevation: 46, zoom: 1.0 },
 ];
 
@@ -50,7 +50,11 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 export function lerpPose(a: CameraPose, b: CameraPose, t: number): CameraPose {
   return {
-    target: [lerp(a.target[0], b.target[0], t), lerp(a.target[1], b.target[1], t), lerp(a.target[2], b.target[2], t)],
+    target: [
+      lerp(a.target[0], b.target[0], t),
+      lerp(a.target[1], b.target[1], t),
+      lerp(a.target[2], b.target[2], t),
+    ],
     azimuth: lerp(a.azimuth, b.azimuth, t),
     elevation: lerp(a.elevation, b.elevation, t),
     zoom: lerp(a.zoom, b.zoom, t),

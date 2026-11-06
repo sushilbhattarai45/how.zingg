@@ -16,7 +16,8 @@ export function LeasingOffice() {
   const sign = useMemo(() => leasingSignTexture(), []);
   const glowRef = useRef<THREE.MeshBasicMaterial>(null);
   const doorMat = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: PALETTE.door, emissive: PALETTE.green, emissiveIntensity: 0 }),
+    () =>
+      new THREE.MeshStandardMaterial({ color: PALETTE.door, emissive: PALETTE.green, emissiveIntensity: 0 }),
     [],
   );
   const [cx, cz] = LEASING.center;
@@ -67,8 +68,18 @@ export function LeasingOffice() {
           castShadow
         />
         <group position={[0, 0.25 + LEASING.h + Math.tan(roofPitch) * halfD * 0.5, 0]}>
-          <Box p={[0, 0, -halfD / 2]} s={[LEASING.w + 0.5, 0.14, slab]} r={[-roofPitch, 0, 0]} color={PALETTE.officeRoof} />
-          <Box p={[0, 0, halfD / 2]} s={[LEASING.w + 0.5, 0.14, slab]} r={[roofPitch, 0, 0]} color={PALETTE.officeRoof} />
+          <Box
+            p={[0, 0, -halfD / 2]}
+            s={[LEASING.w + 0.5, 0.14, slab]}
+            r={[-roofPitch, 0, 0]}
+            color={PALETTE.officeRoof}
+          />
+          <Box
+            p={[0, 0, halfD / 2]}
+            s={[LEASING.w + 0.5, 0.14, slab]}
+            r={[roofPitch, 0, 0]}
+            color={PALETTE.officeRoof}
+          />
         </group>
       </group>
 
@@ -98,7 +109,7 @@ export function LeasingOffice() {
       {/* Front window (lit = the office has news for you) */}
       <WallWindow p={[cx + 1.1, GROUND_Y + 1.5, front + 0.04]} facing="+z" target="leasing" w={1.6} h={1.1} />
       {/* Sign */}
-      <mesh geometry={GEO.plane} position={[cx, GROUND_Y + 2.62, front + 0.06]} scale={[2.4, 0.6, 1]}>
+      <mesh geometry={GEO.plane} position={[cx + 1.1, GROUND_Y + 2.38, front + 0.06]} scale={[2.0, 0.5, 1]}>
         <meshBasicMaterial map={sign} toneMapped={false} />
       </mesh>
     </group>

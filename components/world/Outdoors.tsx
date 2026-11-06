@@ -56,7 +56,11 @@ function Path() {
       const [x1, z1] = PATH_POINTS[i]!;
       const [x2, z2] = PATH_POINTS[i + 1]!;
       const len = Math.hypot(x2 - x1, z2 - z1);
-      out.push({ p: [(x1 + x2) / 2, GROUND_Y + 0.025, (z1 + z2) / 2], len, angle: Math.atan2(x2 - x1, z2 - z1) });
+      out.push({
+        p: [(x1 + x2) / 2, GROUND_Y + 0.025, (z1 + z2) / 2],
+        len,
+        angle: Math.atan2(x2 - x1, z2 - z1),
+      });
     }
     return out;
   }, []);
@@ -90,9 +94,17 @@ function Trees({ quality }: { quality: 'high' | 'low' }) {
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
     list.forEach(([x, z, sc], i) => {
-      m.compose(new THREE.Vector3(x, GROUND_Y + 1.1 * sc, z), q, new THREE.Vector3(0.22 * sc, 2.2 * sc, 0.22 * sc));
+      m.compose(
+        new THREE.Vector3(x, GROUND_Y + 1.1 * sc, z),
+        q,
+        new THREE.Vector3(0.22 * sc, 2.2 * sc, 0.22 * sc),
+      );
       trunks.current?.setMatrixAt(i, m);
-      m.compose(new THREE.Vector3(x, GROUND_Y + 2.9 * sc, z), q, new THREE.Vector3(1.5 * sc, 1.4 * sc, 1.5 * sc));
+      m.compose(
+        new THREE.Vector3(x, GROUND_Y + 2.9 * sc, z),
+        q,
+        new THREE.Vector3(1.5 * sc, 1.4 * sc, 1.5 * sc),
+      );
       canopy.current?.setMatrixAt(i * 2, m);
       m.compose(
         new THREE.Vector3(x + 0.6 * sc, GROUND_Y + 3.5 * sc, z - 0.3 * sc),
@@ -165,7 +177,12 @@ function Bushes() {
   return (
     <group>
       {spots.map(([x, z, r], i) => (
-        <Ball key={i} p={[x, GROUND_Y + r * 0.6, z]} s={[r, r * 0.8, r]} color={i % 2 ? PALETTE.leaf : PALETTE.leafLight} />
+        <Ball
+          key={i}
+          p={[x, GROUND_Y + r * 0.6, z]}
+          s={[r, r * 0.8, r]}
+          color={i % 2 ? PALETTE.leaf : PALETTE.leafLight}
+        />
       ))}
     </group>
   );

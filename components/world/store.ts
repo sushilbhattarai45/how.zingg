@@ -11,13 +11,7 @@ export type WindowTarget = 'office' | 'kitchen' | 'hall' | 'living' | 'bedroom' 
 export const WINDOW_TARGETS: WindowTarget[] = ['office', 'kitchen', 'hall', 'living', 'bedroom', 'leasing'];
 
 export type SceneName =
-  | 'hero'
-  | 'office-lineup'
-  | 'walk-to-apartment'
-  | 'apartment-working'
-  | 'rooms-tour'
-  | 'couch'
-  | 'booked';
+  'hero' | 'office-lineup' | 'walk-to-apartment' | 'apartment-working' | 'rooms-tour' | 'couch' | 'booked';
 
 export type PickHit = { kind: 'bot'; id: BotId } | { kind: 'leasing' } | { kind: 'couch' } | { kind: 'door' };
 
