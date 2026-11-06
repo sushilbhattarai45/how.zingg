@@ -2,7 +2,7 @@
  * Waypoint graph the bots walk on (BUILD_PROMPT §6.4). Edges are straight segments that were
  * laid out to avoid furniture and walls; bots only ever move along them.
  */
-import { GROUND_Y, LINEUP } from './layout';
+import { GROUND_Y, OUTDOOR } from './layout';
 import type { BotId } from './store';
 
 export type NavNodeId = keyof typeof NODES;
@@ -20,7 +20,7 @@ export const NODES = {
   // Office
   office_door: [-3, -2.7],
   office_c: [-5.5, -3.2],
-  caller_desk: [-4.9, -5.5],
+  caller_desk: [-5.8, -5.45],
   office_pace: [-7.8, -2.2],
   office_bed_gap: [-5.6, 0],
   // Bedroom
@@ -35,6 +35,7 @@ export const NODES = {
   printer: [7.4, -5.4],
   k_lane_s: [6.9, -2.2],
   stamp: [7.0, -3.9],
+  packet_desk: [8.4, -3.25],
   // Living
   living_door: [1, 3.0],
   living_c: [3.4, 3.2],
@@ -72,6 +73,8 @@ const EDGES: [NavNodeId, NavNodeId][] = [
   ['stove', 'printer'],
   ['kitchen_c', 'k_lane_s'],
   ['k_lane_s', 'stamp'],
+  ['stamp', 'packet_desk'],
+  ['k_lane_s', 'packet_desk'],
   ['hall_s', 'living_door'],
   ['living_door', 'living_c'],
   ['living_c', 'couch'],
@@ -195,27 +198,99 @@ export type ClipName =
   | 'carry'
   | 'key'
   | 'chat'
-  | 'celebrate';
+  | 'celebrate'
+  /** Talking on the headset, hands gesturing (works while walking). */
+  | 'talk'
+  /** Leaning back in the chair with a desk phone handset. */
+  | 'sit_call'
+  /** One friendly wave, then talking with us. */
+  | 'greet';
 
 /** Where each bot works, which way it faces there (radians, 0 = +z), and its work clip. */
-export const STATIONS: Record<BotId, { node: NavNodeId; face: number; clip: ClipName }> = {
+export type Station = { node: NavNodeId; face: number; clip: ClipName; seat?: 'chair'; paceTo?: NavNodeId };
+
+export const STATIONS: Record<BotId, Station> = {
   concierge: { node: 'couch', face: Math.PI / 2, clip: 'chat' },
   scout: { node: 'scout_easel', face: -Math.PI / 2 + 0.3, clip: 'pin' },
-  caller: { node: 'caller_desk', face: Math.PI, clip: 'phone' },
-  packet: { node: 'printer', face: Math.PI, clip: 'print' },
-  closer: { node: 'door', face: Math.PI, clip: 'key' },
+  caller: { node: 'caller_desk', face: Math.PI * 0.55, clip: 'sit_call', seat: 'chair' },
+  packet: { node: 'packet_desk', face: 0, clip: 'work_desk', seat: 'chair' },
+  closer: { node: 'hall_n', face: Math.PI / 2, clip: 'talk', paceTo: 'door' },
+};
+
+/** What each bot says (speech bubbles). Short, honest, no live facts presented as real. */
+export const LINES: Record<BotId, { out: readonly string[]; work: readonly string[] }> = {
+  concierge: {
+    out: ["Hi! I'm Concierge.", 'What can we help you find?'],
+    work: ['Scout found 9 places.', 'Caller is on with Oak Hollow.', 'Packet is 3 of 4 done.'],
+  },
+  scout: {
+    out: ['Mapping groceries near USM…', 'Checking the bus to campus…', 'Hid 1 scam listing.'],
+    work: [
+      'Pinning Walmart on the map.',
+      'Walk time to campus: checking…',
+      'That listing wants a wire. Hidden.',
+    ],
+  },
+  caller: {
+    out: ['Ring… ring…', "Hi, I'm an AI assistant calling for a student.", 'Can I schedule a call at 9 AM?'],
+    work: [
+      'Ring… ring…',
+      "Hi, I'm an AI assistant calling for a student.",
+      'Is the 1 bed free Aug 14?',
+      'Do you accept an I-20 instead of SSN?',
+    ],
+  },
+  packet: {
+    out: ['I-20 read.', 'Funding letter checked.'],
+    work: ['Packet 3 of 4…', 'Need a bank statement.', 'Renter packet ready soon.'],
+  },
+  closer: {
+    out: ['Can you waive the app fee?', 'Two offers so far.'],
+    work: ['Can you hold it until Aug 14?', 'Any move-in specials?', 'Lease draft on the way.'],
+  },
 };
 
 export const BOT_ORDER: BotId[] = ['concierge', 'scout', 'caller', 'packet', 'closer'];
 
-/** Landing walk: lineup spot → path → front door → station. */
-export function landingRoute(bot: BotId): Polyline {
+/** Landing walk: outdoor hangout spot → front walk → in the door → station. */
+export function landingRoute(bot: BotId, from: P = OUTDOOR[bot].at): Polyline {
   const i = BOT_ORDER.indexOf(bot);
-  const start = LINEUP[i]!;
-  const outside: P[] = [start, NODES.path_4, NODES.path_3, NODES.path_2, NODES.path_1, NODES.front_out];
+  const off = (i - 2) * 0.18;
   const inside = routePoints('front_in', STATIONS[bot].node);
-  // Spread the five bots sideways a little on the path so they don't overlap.
-  const off = (i - 2) * 0.22;
-  const spread = outside.slice(1).map(([x, z]) => [x + off * 0.3, z + off] as P);
-  return polyline([start, ...spread, ...inside]);
+  // Approach the door from the street side, a little spread out so bots don't overlap.
+  const approach: P = [NODES.path_1[0] + off, NODES.path_1[1]];
+  const outside: P[] = [from, approach, [NODES.front_out[0] + off * 0.5, NODES.front_out[1]]];
+  return polyline([...outside, ...inside]);
+}
+
+/** Poke duration (seconds) and what each bot says when you click it, based on what it's doing. */
+export const POKE_SECONDS = 6.4;
+
+export function doingLine(bot: BotId, clip: ClipName, moving: boolean): string {
+  if (clip === 'celebrate') return 'We did it. Your lease is confirmed!';
+  if (moving && clip !== 'talk' && clip !== 'carry') {
+    return bot === 'concierge' ? "I'm walking with you, ask me anything." : 'On my way to my desk!';
+  }
+  switch (bot) {
+    case 'concierge':
+      return clip === 'greet'
+        ? 'I run the plan. What can I help you find?'
+        : 'I keep the team on track and talk with you.';
+    case 'scout':
+      return clip === 'pin' || clip === 'read'
+        ? "I'm mapping places near USM and hiding scams."
+        : "I'm checking groceries, banks and the bus near campus.";
+    case 'caller':
+      return clip === 'sit_call' || clip === 'phone'
+        ? "I'm calling leasing offices to ask about your unit."
+        : 'I call offices during their hours. Always as an AI.';
+    case 'packet':
+      return clip === 'work_desk' || clip === 'print' || clip === 'stamp'
+        ? "I'm building your renter packet. No SSN needed."
+        : "I'm carrying your documents to the desk.";
+    case 'closer':
+      return clip === 'key'
+        ? "I'm tracking your lease to the keys."
+        : "I'm asking for specials and comparing offers.";
+  }
 }

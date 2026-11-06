@@ -22,9 +22,10 @@ describe('camera keyframes', () => {
   it('interpolates with smoothstep between keyframes', () => {
     const mid = poseAt(0.06); // halfway between 0 and 0.12
     expect(smoothstep(0.5)).toBe(0.5);
-    expect(mid.zoom).toBeCloseTo((0.85 + 1.0) / 2);
+    const [a, b] = [LANDING_KEYFRAMES[0]!.zoom, LANDING_KEYFRAMES[1]!.zoom];
+    expect(mid.zoom).toBeCloseTo((a + b) / 2);
     const early = poseAt(0.03); // quarter → smoothstep(0.25) = 0.15625
-    expect(early.zoom).toBeCloseTo(0.85 + 0.15 * 0.15625);
+    expect(early.zoom).toBeCloseTo(a + (b - a) * 0.15625);
   });
   it('is monotonic in keyframe order', () => {
     for (let i = 1; i < LANDING_KEYFRAMES.length; i++) {

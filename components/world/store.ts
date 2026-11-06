@@ -35,7 +35,21 @@ export type WorldState = {
 };
 
 /** Where a bot should be and what it should do. Written by a director every frame, read by <Bot>. */
-export type BotDrive = { x: number; z: number; face: number; clip: ClipName; showRole: boolean };
+export type BotDrive = {
+  x: number;
+  z: number;
+  face: number;
+  clip: ClipName;
+  showRole: boolean;
+  /** Lines the bot says in a speech bubble, cycling with gaps. null = quiet. */
+  say: readonly string[] | null;
+  /** Sitting: an office chair (rendered with the bot) or the street bench. */
+  seat: 'none' | 'chair' | 'bench';
+  /** Turn toward the camera instead of `face`. */
+  faceCamera: boolean;
+};
+
+export const DRIVE_DEFAULTS = { showRole: false, say: null, seat: 'none', faceCamera: false } as const;
 
 type Listener = () => void;
 
@@ -55,13 +69,35 @@ export function createWorldStore(initial: Partial<WorldState> = {}) {
     ...initial,
   };
   const drive = Object.fromEntries(
-    BOT_IDS.map((id, i) => [id, { x: 14.6 + i, z: 9.8, face: 0.6, clip: 'idle', showRole: false }]),
+    BOT_IDS.map((id, i) => [id, { x: 14.6 + i, z: 9.8, face: 0.6, clip: 'idle', ...DRIVE_DEFAULTS }]),
   ) as Record<BotId, BotDrive>;
+  /** One bot talks at a time (see SpeechDirector). Mutable, read per frame. */
+  const speech = { id: null as BotId | null, line: '', start: 0, until: 0 };
+  /** Lines that jump the speech queue (a bot you clicked introducing itself). */
+  const speechQueue: { id: BotId; line: string; dur: number }[] = [];
+  /**
+   * Clicked bots: when the poke started (world clock seconds). While poked a bot stops, turns to
+   * you, smiles and waves. -1 = not poked; Infinity start = "poke on the next frame".
+   */
+  const pokes = Object.fromEntries(BOT_IDS.map((id) => [id, -1])) as Record<BotId, number>;
+  /** Whether each bot's head is on screen this frame (written by <Bot>). */
+  const onScreen = Object.fromEntries(BOT_IDS.map((id) => [id, false])) as Record<BotId, boolean>;
+  /** Whether each bot is walking this frame (written by <Bot>); walking bots don't chat. */
+  const moving = Object.fromEntries(BOT_IDS.map((id) => [id, false])) as Record<BotId, boolean>;
   const listeners = new Set<Listener>();
   const pickListeners = new Set<(hit: PickHit) => void>();
 
   return {
     drive,
+    speech,
+    speechQueue,
+    pokes,
+    onScreen,
+    moving,
+    /** Ask a bot to say hi: it smiles, waves and says what it's doing. */
+    poke(id: BotId) {
+      pokes[id] = Infinity;
+    },
     get: () => state,
     set(patch: Partial<WorldState>) {
       state = { ...state, ...patch };

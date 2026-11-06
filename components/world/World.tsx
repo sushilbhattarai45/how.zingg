@@ -8,8 +8,11 @@ import { CameraRig } from './CameraRig';
 import { Outdoors } from './Outdoors';
 import { Apartment } from './Apartment';
 import { LeasingOffice } from './LeasingOffice';
+import { Campus } from './Campus';
+import { ApartmentExterior } from './ApartmentExterior';
 import { WindowDriver } from './LitWindows';
 import { Bot } from './Bot';
+import { SpeechDirector } from './SpeechDirector';
 import { AppDirector, LandingDirector } from './directors';
 import { AGENTS } from '@/content/agents';
 import { detectQuality, hasWebGL, prefersReducedMotion } from './quality';
@@ -22,6 +25,8 @@ export type WorldHandle = {
   lightWindow(target: WindowTarget, on: boolean): void;
   focus(target: FocusTarget): void;
   onPick(cb: (hit: PickHit) => void): () => void;
+  /** Make a bot smile, wave and say what it's doing (same as clicking it). */
+  poke(bot: BotId): void;
   /** Bot APIs land in M3; until then they resolve immediately. */
   toss(from: BotId, to: BotId): Promise<void>;
   walkTo(bot: BotId, node: string): Promise<void>;
@@ -85,6 +90,7 @@ export function World({
       lightWindow: (target, on) => store.setWindow(target, on),
       focus: (target) => store.set({ focus: target }),
       onPick: (cb) => store.onPick(cb),
+      poke: (bot) => store.poke(bot),
       toss: async () => {},
       walkTo: async () => {},
       playClip: () => {},
@@ -100,7 +106,7 @@ export function World({
             <Canvas
               orthographic
               shadows={env.quality === 'high' ? 'percentage' : false}
-              dpr={env.quality === 'high' ? [1, 2] : [1, 1.5]}
+              dpr={env.quality === 'high' ? [1, 1.5] : [1, 1.25]}
               frameloop={paused ? 'never' : 'always'}
               camera={{ position: [30, 30, 30], zoom: 20, near: 0.1, far: 400 }}
               gl={{
@@ -111,14 +117,17 @@ export function World({
               style={{ touchAction: mode === 'app' ? 'none' : 'auto' }}
             >
               <color attach="background" args={[SKY]} />
-              <fog attach="fog" args={[SKY, 70, 150]} />
+              <fog attach="fog" args={[SKY, 60, 140]} />
               <Lights quality={env.quality} />
               <CameraRig />
               <WindowDriver />
               <Outdoors quality={env.quality} />
+              <Campus quality={env.quality} />
               <Apartment quality={env.quality} />
+              {mode === 'landing' && <ApartmentExterior />}
               <LeasingOffice />
               {mode === 'landing' ? <LandingDirector /> : <AppDirector />}
+              <SpeechDirector />
               {AGENTS.map((a) => (
                 <Bot key={a.id} id={a.id} name={a.name} color={a.color} />
               ))}
@@ -137,7 +146,7 @@ function Lights({ quality }: { quality: 'high' | 'low' }) {
         intensity={2.4}
         position={[14, 22, 12]}
         castShadow={quality === 'high'}
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={[1024, 1024]}
         shadow-camera-left={-30}
         shadow-camera-right={30}
         shadow-camera-top={30}

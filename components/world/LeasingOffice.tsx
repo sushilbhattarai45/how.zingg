@@ -15,6 +15,7 @@ export function LeasingOffice() {
   const store = useWorldStore();
   const sign = useMemo(() => leasingSignTexture(), []);
   const glowRef = useRef<THREE.MeshBasicMaterial>(null);
+  const glow = useRef(0);
   const doorMat = useMemo(
     () =>
       new THREE.MeshStandardMaterial({ color: PALETTE.door, emissive: PALETTE.green, emissiveIntensity: 0 }),
@@ -23,11 +24,13 @@ export function LeasingOffice() {
   const [cx, cz] = LEASING.center;
   const front = cz + LEASING.d / 2;
 
-  useFrame(({ clock }) => {
+  useFrame((_, delta) => {
     const { officeGlow, reducedMotion } = store.get();
-    const pulse = reducedMotion ? 1 : 0.6 + 0.4 * Math.sin((clock.elapsedTime * Math.PI * 2) / 1.6);
-    doorMat.emissiveIntensity = officeGlow ? 0.9 * pulse : 0;
-    if (glowRef.current) glowRef.current.opacity = officeGlow ? 0.35 * pulse : 0;
+    // Steady glow (no pulsing): eases on and off over ~0.5 s.
+    const k = reducedMotion ? 1 : 1 - Math.exp(-delta * 5);
+    glow.current += ((officeGlow ? 1 : 0) - glow.current) * k;
+    doorMat.emissiveIntensity = 0.55 * glow.current;
+    if (glowRef.current) glowRef.current.opacity = 0.22 * glow.current;
   });
 
   const pick = (e: ThreeEvent<MouseEvent>) => {

@@ -30,12 +30,13 @@ describe('nav graph', () => {
   it('connects the leasing office to the apartment', () => {
     expect(routePoints('leasing_out', 'couch').length).toBeGreaterThan(5);
   });
-  it('walks a landing route from the lineup to each station', () => {
-    const r = landingRoute('packet');
-    const end = along(r, r.length);
-    expect(end.x).toBeCloseTo(NODES.printer[0]);
-    expect(end.z).toBeCloseTo(NODES.printer[1]);
-    expect(r.length).toBeGreaterThan(20);
+  it('walks a landing route from the block to each station', () => {
+    for (const [bot, st] of Object.entries(STATIONS)) {
+      const r = landingRoute(bot as keyof typeof STATIONS);
+      const end = along(r, r.length);
+      expect(end.x).toBeCloseTo(NODES[st.node][0]);
+      expect(end.z).toBeCloseTo(NODES[st.node][1]);
+    }
   });
   it('interpolates along a polyline', () => {
     const pl = polyline([

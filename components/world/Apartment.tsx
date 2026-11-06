@@ -185,9 +185,9 @@ function Office({ quality }: { quality: 'high' | 'low' }) {
         </mesh>
       </group>
       <Lamp p={[-6.6, 0.75, -6.6]} height={0.4} />
-      {/* Chair */}
-      <Block p={[-5.8, 0, -5.6]} s={[0.55, 0.45, 0.55]} color={PALETTE.armchair} />
-      <Block p={[-5.8, 0.45, -5.35]} s={[0.55, 0.5, 0.08]} color={PALETTE.armchair} />
+      {/* Desk phone (Caller's handset lives in its hand; the swivel chair comes with the bot) */}
+      <Block p={[-4.95, 0.75, -6.3]} s={[0.34, 0.1, 0.26]} color={PALETTE.ink} />
+      <Box p={[-4.95, 0.86, -6.3]} s={[0.2, 0.02, 0.12]} color="#ff8a4c" shadow={false} />
       {/* Whiteboard "Calls today" */}
       <group position={[-4.5, 2.0, -6.98]}>
         <Box p={[0, 0, 0]} s={[1.5, 0.95, 0.04]} color="#d9d1c2" shadow={false} />
@@ -353,12 +353,25 @@ function Kitchen({ quality }: { quality: 'high' | 'low' }) {
           <Cyl p={[0, 0.72, 0]} s={[0.2, 0.06, 0.2]} color={PALETTE.woodDark} />
         </group>
       ))}
-      {/* Round dining table */}
-      <group position={[8.5, 0, -2.9]}>
-        <Cyl p={[0, 0.38, 0]} s={[0.06, 0.76, 0.06]} color={PALETTE.woodDark} />
-        <Cyl p={[0, 0.76, 0]} s={[0.6, 0.05, 0.6]} color={PALETTE.wood} />
-        <Block p={[0.85, 0, 0]} s={[0.45, 0.45, 0.45]} color={PALETTE.woodDark} />
-        <Block p={[-0.85, 0, 0]} s={[0.45, 0.45, 0.45]} color={PALETTE.woodDark} />
+      {/* Packet's desk: laptop facing the bot, a stack of documents */}
+      <group position={[8.4, 0, -2.5]}>
+        <Block p={[0, 0.72, 0]} s={[1.5, 0.05, 0.7]} color={PALETTE.wood} />
+        <Block p={[-0.68, 0, 0]} s={[0.07, 0.72, 0.6]} color={PALETTE.woodDark} />
+        <Block p={[0.68, 0, 0]} s={[0.07, 0.72, 0.6]} color={PALETTE.woodDark} />
+        <Block p={[0, 0.77, -0.15]} s={[0.55, 0.03, 0.36]} color="#3a373b" />
+        <group position={[0, 0.98, 0.04]} rotation={[0.25, 0, 0]}>
+          <Box s={[0.55, 0.38, 0.03]} color="#3a373b" />
+          <mesh
+            geometry={GEO.plane}
+            position={[0, 0, -0.017]}
+            rotation={[0, Math.PI, 0]}
+            scale={[0.49, 0.32, 1]}
+          >
+            <meshBasicMaterial color="#f2c230" toneMapped={false} />
+          </mesh>
+        </group>
+        <Block p={[0.5, 0.77, 0.05]} s={[0.3, 0.08, 0.38]} color="#f7f5f0" />
+        <Block p={[-0.52, 0.77, 0.08]} s={[0.24, 0.05, 0.32]} color="#e5dccb" />
       </group>
       {quality === 'high' && <Plant p={[1.6, 0, -6.5]} scale={0.7} />}
     </group>

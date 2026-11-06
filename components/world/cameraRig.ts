@@ -13,14 +13,19 @@ export type Keyframe = CameraPose & { at: number };
 
 /** Landing keyframes (BUILD_PROMPT §7.2). Close-up zooms are ~0.7× the spec's values to suit our base fit. */
 export const LANDING_KEYFRAMES: Keyframe[] = [
-  { at: 0.0, target: [4, 0.9, 3], azimuth: 45, elevation: 52, zoom: 0.85 },
-  { at: 0.12, target: [2, 0.9, 2], azimuth: 40, elevation: 44, zoom: 1.0 },
-  { at: 0.22, target: [16, 0.8, 8], azimuth: 35, elevation: 34, zoom: 1.45 },
-  { at: 0.38, target: [16.5, 1.0, 8], azimuth: 30, elevation: 30, zoom: 1.8 },
-  { at: 0.5, target: [8, 0.6, 9], azimuth: 40, elevation: 38, zoom: 1.1 },
+  // Hero: wide establishing shot. Campus and its dome behind, the closed apartment building,
+  // the leasing office, and the five bots out on the block.
+  { at: 0.0, target: [-2, 5.5, -7], azimuth: 35, elevation: 22, zoom: 0.56 },
+  { at: 0.12, target: [2, 2, 0], azimuth: 37, elevation: 26, zoom: 0.72 },
+  // Team: down the block where the bots are working.
+  { at: 0.22, target: [11, 0.8, 10], azimuth: 35, elevation: 30, zoom: 1.15 },
+  // Ask: Concierge waits at the leasing office door.
+  { at: 0.38, target: [15.5, 1.2, 8.5], azimuth: 30, elevation: 26, zoom: 1.9 },
+  // To work: watch them walk in while the roof lifts off.
+  { at: 0.5, target: [5, 1.5, 6], azimuth: 40, elevation: 34, zoom: 0.95 },
   { at: 0.64, target: [-6.5, 0.9, -3.5], azimuth: 45, elevation: 42, zoom: 1.6 },
   { at: 0.7, target: [-1, 0.9, 1], azimuth: 45, elevation: 42, zoom: 1.6 },
-  { at: 0.76, target: [4, 0.9, -4.5], azimuth: 45, elevation: 42, zoom: 1.6 },
+  { at: 0.76, target: [6, 0.9, -3.8], azimuth: 45, elevation: 42, zoom: 1.6 },
   { at: 0.82, target: [6, 0.9, 2.5], azimuth: 45, elevation: 40, zoom: 1.5 },
   { at: 0.9, target: [-1, 0.9, -5], azimuth: 45, elevation: 40, zoom: 1.5 },
   { at: 1.0, target: [4, 0.9, 3], azimuth: 45, elevation: 46, zoom: 1.0 },

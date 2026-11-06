@@ -173,3 +173,112 @@ function drawTag(
   ctx.textBaseline = 'middle';
   ctx.fillText(name, 24 * scale, h / 2 + scale);
 }
+
+/** Speech bubble: chalk rounded box with a tail at the bottom center, ink text. Aspect is w/h. */
+export function bubbleTexture(text: string) {
+  const key = `bubble:${text}`;
+  const hit = cache.get(key);
+  const sizeOf = (t: THREE.CanvasTexture) => {
+    const c = t.image as HTMLCanvasElement;
+    return { tex: t, aspect: c.width / c.height };
+  };
+  if (hit) return sizeOf(hit);
+  const scale = 4;
+  const font = `800 ${15 * scale}px ${FONT}`;
+  const measure = document.createElement('canvas').getContext('2d')!;
+  measure.font = font;
+  const w = Math.ceil(measure.measureText(text).width + 36 * scale);
+  const h = 44 * scale;
+  const tex = make(key, w, h, (ctx) => drawBubble(ctx, w, h, scale, text, font));
+  document.fonts?.ready.then(() => {
+    const c = tex.image as HTMLCanvasElement;
+    drawBubble(c.getContext('2d')!, c.width, c.height, scale, text, font);
+    tex.needsUpdate = true;
+  });
+  return sizeOf(tex);
+}
+
+function drawBubble(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  scale: number,
+  text: string,
+  font: string,
+) {
+  const body = h - 10 * scale;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.roundRect(0, 0, w, body, body / 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(w / 2 - 8 * scale, body - 1);
+  ctx.lineTo(w / 2, h);
+  ctx.lineTo(w / 2 + 8 * scale, body - 1);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#191719';
+  ctx.font = font;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, w / 2, body / 2 + scale);
+}
+
+/** Campus sign: stone panel, plain type. No logos (DESIGN.md §12). */
+export function campusSignTexture() {
+  return make('campus-sign', 1024, 192, (ctx) => {
+    ctx.fillStyle = '#e9e3d6';
+    ctx.fillRect(0, 0, 1024, 192);
+    ctx.fillStyle = '#2c2a2d';
+    ctx.font = `800 64px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('University of Southern', 512, 66);
+    ctx.fillText('Mississippi', 512, 138);
+  });
+}
+
+/**
+ * Brick facade with a window grid. Returns a color map and an emissive map (only lit windows),
+ * so lit windows glow warm in the evening without extra lights.
+ */
+export function facadeTextures(cols: number, rows: number, brick: string, seed: number) {
+  const cw = 64;
+  const ch = 80;
+  const w = cols * cw;
+  const h = rows * ch;
+  let s = seed * 9301 + 49297;
+  const rand = () => {
+    s = (s * 9301 + 49297) % 233280;
+    return s / 233280;
+  };
+  const lit: boolean[] = Array.from({ length: cols * rows }, () => rand() < 0.45);
+  const cell = (ctx: CanvasRenderingContext2D, i: number, fill: string) => {
+    const c = i % cols;
+    const r = Math.floor(i / cols);
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.roundRect(c * cw + 16, r * ch + 18, cw - 32, ch - 32, 6);
+    ctx.fill();
+  };
+  const map = make(`facade:${cols}:${rows}:${brick}:${seed}`, w, h, (ctx) => {
+    ctx.fillStyle = brick;
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = 'rgba(0,0,0,0.08)';
+    for (let y = 0; y < h; y += 10) ctx.fillRect(0, y, w, 1.5);
+    ctx.fillStyle = '#e9e3d6';
+    for (let i = 0; i < cols * rows; i++) {
+      const c = i % cols;
+      const r = Math.floor(i / cols);
+      ctx.fillRect(c * cw + 12, r * ch + 14, cw - 24, ch - 24);
+    }
+    for (let i = 0; i < cols * rows; i++) cell(ctx, i, lit[i] ? '#ffd9a0' : '#2b2a33');
+  });
+  const glow = make(`facade-glow:${cols}:${rows}:${seed}`, w, h, (ctx) => {
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < cols * rows; i++) if (lit[i]) cell(ctx, i, '#ffc98a');
+  });
+  return { map, glow };
+}
