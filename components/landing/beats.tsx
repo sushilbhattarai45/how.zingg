@@ -5,6 +5,7 @@ import { Button, ButtonLink } from '@/components/ui/Button';
 import { AgentDot } from '@/components/ui/AgentDot';
 import { UniversityPicker } from '@/components/ui/UniversityPicker';
 import { AGENTS, AGENT_COLOR } from '@/content/agents';
+import type { BotId } from '@/components/world/store';
 
 const H2 = 'text-[28px] leading-8 font-extrabold';
 const BODY = 'mt-2 text-[15px] leading-[22px] text-text-2';
@@ -63,31 +64,32 @@ export function ProblemBeat() {
   );
 }
 
-export function TeamBeat() {
+export function TeamBeat({ onPoke }: { onPoke?: (id: BotId) => void }) {
   return (
     <div>
       <p className="label-caps text-text-3">Meet your team</p>
       <h2 className={`${H2} mt-1`}>Meet your team.</h2>
-      <p className={BODY}>Five agents, one job: get you a confirmed lease.</p>
-      <ul className="mt-4 flex flex-col gap-2">
+      <p className={BODY}>Five agents, one job: get you a confirmed lease. Tap one to say hi.</p>
+      <ul className="mt-4 flex flex-col gap-1">
         {AGENTS.map((a) => (
-          <li
-            key={a.id}
-            tabIndex={0}
-            className="flex items-start gap-3 rounded-[12px] px-2 py-2 hover:bg-raised focus:bg-raised"
-          >
-            <span className="mt-1.5">
-              <AgentDot color={a.color} size={12} />
-            </span>
-            <span>
-              <span className="font-bold">{a.name}</span>
-              <span className="block text-[13px] leading-[19px] text-text-2">{a.role}</span>
-            </span>
+          <li key={a.id}>
+            <button
+              onClick={() => onPoke?.(a.id)}
+              className="flex w-full items-start gap-3 rounded-[12px] px-2 py-2 text-left hover:bg-raised focus-visible:bg-raised"
+            >
+              <span className="mt-1.5">
+                <AgentDot color={a.color} size={12} />
+              </span>
+              <span>
+                <span className="font-bold">{a.name}</span>
+                <span className="block text-[13px] leading-[19px] text-text-2">{a.role}</span>
+              </span>
+            </button>
           </li>
         ))}
       </ul>
       <p className="mt-3 text-[13px] leading-[19px] text-text-3">
-        They&apos;re waiting outside the leasing office.
+        They&apos;re already out on the block, working.
       </p>
     </div>
   );
