@@ -55,7 +55,7 @@ function unitWanted(q: string): string | null {
 
 function listingLine(l: Listing) {
   const walk = walkMin(l);
-  return `$${l.rent} a month${walk ? `, ${walk} min walk to ${WALK_TO}` : ''}`;
+  return `${l.unitType}${walk ? `, ${walk} min walk to ${WALK_TO}` : ''} · rent via call`;
 }
 
 export function answerExample(query: string): AskAnswer {
@@ -85,9 +85,9 @@ export function answerExample(query: string): AskAnswer {
     const steps = [
       `Reading ${all.length} listings near USM…`,
       'Checking for scams…',
-      'Comparing rent and walk times…',
+      'Comparing walk times and move-in dates…',
     ];
-    const label = `${unit ?? 'place'}${cap ? ` under $${cap}` : ''}`;
+    const label = `${unit ?? 'place'}${cap ? ` near your budget` : ''}`;
     if (!fits.length) {
       return {
         kind: 'none',
@@ -103,8 +103,9 @@ export function answerExample(query: string): AskAnswer {
       kind: 'listings',
       mood: 'happy',
       say:
-        `Cheapest ${label}: ${best!.title} at ${listingLine(best!)}.` +
-        (next ? ` Next is ${next.title} at $${next.rent}.` : '') +
+        `Good match for ${label}: ${best!.title} — ${listingLine(best!)}.` +
+        (next ? ` Next up: ${next.title} (${next.unitType}).` : '') +
+        ` Caller will confirm rent on the phone.` +
         (scams.length ? ` I hid ${scams.length} scam listing.` : ''),
       steps,
       results: fits.slice(0, 4).map((l) => ({

@@ -73,7 +73,7 @@ export function SwipeDeck({
   const [step, setStep] = useState(0);
   const [index, setIndex] = useState(0);
   const [mood, setMood] = useState<BotMood>('idle');
-  const [line, setLine] = useState('Where should I look? Drop a campus or street near you.');
+  const [line, setLine] = useState('Where should I look in ' + campusLabel() + '?');
   const [picks, setPicks] = useState<Pick[]>([]);
   const [toss, setToss] = useState(0);
   const [dir, setDir] = useState(SKIP);
@@ -86,7 +86,7 @@ export function SwipeDeck({
   const searchSteps = useCallback(
     (q: string) => [
       `Reading places near “${q || campusLabel()}”…`,
-      'Checking rent, walk times, and no-SSN notes…',
+      'Checking walk times, move-in dates, and no-SSN notes…',
       'Ranking the best matches for you…',
     ],
     [],
@@ -257,25 +257,25 @@ export function SwipeDeck({
             }}
           >
             <label className="flex flex-col gap-1.5">
-              <span className="text-[13px] font-bold">Campus or street address</span>
+              <span className="text-[13px] font-bold">Where should I look in {campusLabel()}?</span>
               <span className="flex items-center gap-2 rounded-[16px] border border-line bg-surface px-3">
                 <MapPin size={18} className="text-scout" aria-hidden />
                 <input
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="e.g. Scianna Hall, Hattiesburg MS"
+                  placeholder="e.g. Scianna Hall, Near Wilber Hall"
                   className="h-12 min-w-0 flex-1 bg-transparent text-[15px] font-semibold outline-none placeholder:text-text-3"
                   autoFocus
                 />
               </span>
             </label>
             <Button type="submit" className="w-full">
-              Search with Scout
+              Search with Agent Scout
             </Button>
-            <p className="text-[12px] leading-4 text-text-3">
+            {/* <p className="text-[12px] leading-4 text-text-3">
               Example places near {campusLabel()} (hardcoded photos — no live scrape yet). Left-swipe
               adds to My Places; call from there rings <strong>your</strong> DEMO_CALL_TO only.
-            </p>
+            </p> */}
             {callError && (
               <p role="alert" className="text-[14px] font-semibold text-[#F25C8A]">
                 {callError}
@@ -565,14 +565,14 @@ function CardView({ card, under }: { card: SwipeCard; under?: boolean }) {
             </p>
           </div>
         </div>
-        <p className="mt-3 text-[28px] leading-8 font-extrabold tabular">
-          ${card.rent}
-          <span className="text-[14px] font-bold text-text-3">
-            {' '}
-            / month{card.deposit !== undefined && ` · $${card.deposit} deposit`}
-          </span>
+        <p className="mt-3 text-[16px] leading-6 font-bold text-chalk">{card.pitch}</p>
+        <p className="mt-1 text-[13px] leading-5 text-text-3">
+          Rent &amp; deposit — Caller confirms on the phone (we don&apos;t guess).
         </p>
         <ul className="mt-3 flex flex-wrap gap-2 text-[13px] leading-4 font-bold">
+          <li className="flex items-center gap-1.5 rounded-full bg-raised px-3 py-1.5">
+            {card.unitType}
+          </li>
           {card.walkMin !== undefined && (
             <li className="flex items-center gap-1.5 rounded-full bg-raised px-3 py-1.5">
               <Footprints size={14} aria-hidden /> {card.walkMin} min walk to Scianna Hall

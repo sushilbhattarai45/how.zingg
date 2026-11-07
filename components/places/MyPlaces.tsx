@@ -317,7 +317,7 @@ export function MyPlaces() {
                     <div>
                       <h2 className="text-[20px] leading-6 font-extrabold">{row.placeTitle}</h2>
                       <p className="mt-0.5 text-[13px] text-text-2">
-                        {row.unitType} · ${row.rent}/mo
+                        {row.unitType} · rent confirmed on call
                       </p>
                       <p className="mt-1 flex items-start gap-1 text-[12px] leading-4 text-text-3">
                         <MapPin size={12} className="mt-0.5 shrink-0" aria-hidden />

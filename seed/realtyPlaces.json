@@ -29,7 +29,7 @@
       "officeName": "Pine Row Leasing",
       "availableFrom": "2027-08-01",
       "sourceUrl": "https://pinerow.example/floorplans",
-      "pitch": "Just $640 a month!",
+      "pitch": "Quiet street near campus — ask Caller for today’s rent.",
       "image": "/places/pine-row.jpg",
       "imageFallback": "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80"
     },
@@ -61,7 +61,7 @@
       "officeName": "Willow Park Leasing",
       "availableFrom": "2027-08-05",
       "sourceUrl": "https://willowpark.example/units",
-      "pitch": "Close to campus, and in your budget.",
+      "pitch": "Close to campus — Caller will confirm rent live.",
       "image": "/places/willow-park.jpg",
       "imageFallback": "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=800&q=80"
     },
@@ -77,7 +77,7 @@
       "officeName": "Cedar Flats Leasing",
       "availableFrom": "2027-08-10",
       "sourceUrl": "https://cedarflats.example/rooms",
-      "pitch": "Just $410 a month!",
+      "pitch": "Shared 2-bed option — ask Caller what a room costs now.",
       "image": "/places/cedar-flats.jpg",
       "imageFallback": "https://images.unsplash.com/photo-1484154218962-a197022b5858?w=800&q=80"
     },

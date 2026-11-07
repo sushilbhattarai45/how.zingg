@@ -22,6 +22,7 @@ describe('place conversation', () => {
     const s = scriptFor(card, opts);
     expect(s.map((l) => l.from)).toEqual(['scout', 'concierge', 'caller']);
     expect(s[0]!.text).toMatch(/Added to your list/i);
+    expect(s[0]!.text).not.toMatch(/\$\d/);
     expect(s.some((l) => l.action === 'schedule-call')).toBe(true);
     expect(s.every((l) => !l.log)).toBe(true);
     expect(s.at(-1)!.step).toBeLessThan(STEPS.length);

@@ -81,7 +81,7 @@ export function scriptFor(
     {
       after: 0,
       from: 'scout',
-      text: `Added to your list — ${card.title}: $${card.rent} a month${walk}.`,
+      text: `Added to your list — ${card.title} (${card.unitType}${walk}). Rent TBD — Caller will ask on the phone.`,
       step: 0,
       status: 'Added',
     },

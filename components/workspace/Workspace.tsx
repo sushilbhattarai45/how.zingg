@@ -715,7 +715,7 @@ function MyList({
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center justify-between gap-2">
                         <span className="truncate font-bold">{p.card.title}</span>
-                        <span className="tabular text-[13px] font-bold text-text-2">${p.card.rent}</span>
+                        <span className="truncate text-[12px] font-bold text-text-3">{p.card.unitType}</span>
                       </span>
                       <span className="mt-0.5 block truncate text-[12px] leading-4 text-text-3">
                         {p.status}
@@ -873,7 +873,7 @@ function Conversation({
         <div className="min-w-0 flex-1">
           <p className="truncate font-bold">{card.title}</p>
           <p className="truncate text-[12px] leading-4 text-text-3">
-            Team active now · {calls} {calls === 1 ? 'call' : 'calls'} · ${card.rent}/mo ·{' '}
+            Team active now · {calls} {calls === 1 ? 'call' : 'calls'} · {card.unitType} · rent via call ·{' '}
             <a href={card.sourceUrl} target="_blank" rel="noreferrer" className="underline">
               Source
             </a>
