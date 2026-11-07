@@ -3,8 +3,11 @@
  * progress steps. Pure, so it's testable. Honest by design: Caller never invents live answers.
  */
 import { formatDual } from '@/lib/time';
-import { detectCallbackMinutesFromTranscript } from '@/lib/callGuardrails';
 import type { SwipeCard } from '@/lib/swipeDeck';
+import { collectCallFacts, formatCallNotesChat, isMissedCall } from '@/lib/callFacts';
+import { parseYesNo } from '@/lib/chatFormat';
+
+export { collectCallFacts, formatCallNotesChat, isMissedCall } from '@/lib/callFacts';
 
 export type AgentName = 'concierge' | 'scout' | 'caller' | 'packet' | 'closer';
 
@@ -22,14 +25,28 @@ export type LogEntry =
       /** Real call from the backend vs. example data. */
       example: boolean;
     }
-  | { kind: 'email'; to: string; example: boolean };
+  | {
+      kind: 'email';
+      to: string;
+      /** Why we emailed (shown in chat). */
+      reason?: string;
+      example: boolean;
+    }
+  | {
+      kind: 'document';
+      fileName: string;
+      summary?: string;
+      /** In-app viewer or storage URL. */
+      href?: string;
+      example: boolean;
+    };
 
 export type ChatMessage = {
   id: string;
   from: AgentName | 'you';
   text: string;
   /** A button the student can tap (e.g. schedule a call). */
-  action?: 'add-documents' | 'schedule-call' | 'pick-call-when';
+  action?: 'add-documents' | 'schedule-call' | 'pick-call-when' | 'confirm-call-offer';
   /** When set, the message renders as a call/email log row. */
   log?: LogEntry;
   at: number; // epoch ms
@@ -40,12 +57,19 @@ export type PendingCallAsk = {
   questions: string[];
 };
 
+/** Guide offered to call because something was unknown — waiting for yes/no. */
+export type PendingCallOffer = {
+  question: string;
+};
+
 export type ChatTurnResult = {
   reply: string;
   from: AgentName;
   action?: ChatMessage['action'];
   /** Set to start waiting for a when; null clears. */
   pendingAsk?: PendingCallAsk | null;
+  /** Set when Guide asked “want me to call?”; null clears. */
+  pendingCallOffer?: PendingCallOffer | null;
   /** Dial now (0) or after N minutes with the pending/extracted questions. */
   dial?: { delayMinutes: number; questions: string[] };
 };
@@ -103,8 +127,6 @@ export function scriptFor(
   ];
 }
 
-const LIVE = /\b(available|availability|free on|open|price|rent today|special|hold|unit|vacan)/i;
-
 /** Normalize a free-text ask into a question Caller can read on the phone. */
 export function normalizeCallQuestion(raw: string): string {
   let q = raw.replace(/\s+/g, ' ').trim().replace(/^["']|["']$/g, '');
@@ -124,20 +146,33 @@ export function normalizeCallQuestion(raw: string): string {
 }
 
 /**
+ * True only for explicit Caller intents, e.g.:
+ * “call and ask …”, “call them about …”, “ask them …”, “ask this …”, “schedule a call”.
+ * Ordinary questions stay in chat for Gemini — they must NOT dial.
+ */
+export function wantsExplicitCall(text: string): boolean {
+  const t = text.trim();
+  if (!t) return false;
+  if (/\bschedule a call\b/i.test(t)) return true;
+  if (/\bhave caller\b/i.test(t)) return true;
+  if (/\bcall (and|&) ask\b/i.test(t)) return true;
+  if (/\b(call|ring|dial)\s+(them|the office|leasing)\b/i.test(t)) return true;
+  if (/\b(call|ring|dial).{0,48}\bask\b/i.test(t)) return true;
+  if (/\bask (them|the office|leasing|this)\b/i.test(t)) return true;
+  return false;
+}
+
+/**
  * Pull “call and ask …” / “ask them …” questions from a chat line.
  * Returns [] when they want a call with default questions; null when not a call request.
  */
 export function extractCallQuestions(text: string): string[] | null {
   const t = text.trim();
-  const wantsCall =
-    /\b(call|ring|dial|phone)\b/i.test(t) ||
-    /\bask (them|the office|leasing|about|if|whether)\b/i.test(t) ||
-    /\bschedule a call\b/i.test(t);
-  if (!wantsCall) return null;
+  if (!wantsExplicitCall(t)) return null;
 
   const ask =
-    t.match(/\bask(?:\s+(?:them|the office|leasing))?\s+(.+)$/i) ||
-    t.match(/\b(?:call|ring|dial).{0,48}?\bask(?:\s+(?:them|the office|leasing))?\s+(.+)$/i);
+    t.match(/\bask(?:\s+(?:them|the office|leasing|this))?\s+(.+)$/i) ||
+    t.match(/\b(?:call|ring|dial).{0,48}?\bask(?:\s+(?:them|the office|leasing|this))?\s+(.+)$/i);
   if (ask?.[1]) {
     const parts = ask[1]
       .split(/\band also\b|\balso\b|;|\n/i)
@@ -149,6 +184,7 @@ export function extractCallQuestions(text: string): string[] | null {
   const about = t.match(/\b(?:call|ring|dial).{0,40}\babout\s+(.+)$/i);
   if (about?.[1]) return [normalizeCallQuestion(about[1])];
 
+  // “call them” / “schedule a call” with no specific question → defaults.
   return [];
 }
 
@@ -188,7 +224,50 @@ export function handleChatTurn(
   text: string,
   card: SwipeCard,
   pending: PendingCallAsk | null,
+  pendingCallOffer: PendingCallOffer | null = null,
 ): ChatTurnResult {
+  // After Guide asked “want me to call?” — yes → schedule when; no → stay in chat.
+  if (pendingCallOffer) {
+    const yn = parseYesNo(text);
+    if (yn === 'yes') {
+      const questions = [normalizeCallQuestion(pendingCallOffer.question)];
+      const prompt = whenPrompt(questions);
+      return {
+        from: 'concierge',
+        reply: prompt.text,
+        action: prompt.action,
+        pendingAsk: { questions },
+        pendingCallOffer: null,
+      };
+    }
+    if (yn === 'no') {
+      return {
+        from: 'concierge',
+        reply: '• Got it — I won’t call.\n• Ask me anything else about this place, or say “call and ask …” later if you change your mind.',
+        pendingCallOffer: null,
+        pendingAsk: null,
+      };
+    }
+    // Explicit call phrasing still works while the offer is open.
+    const freshDuringOffer = extractCallQuestions(text);
+    if (freshDuringOffer) {
+      const prompt = whenPrompt(freshDuringOffer);
+      return {
+        from: 'concierge',
+        reply: prompt.text,
+        action: prompt.action,
+        pendingAsk: { questions: freshDuringOffer },
+        pendingCallOffer: null,
+      };
+    }
+    return {
+      from: 'concierge',
+      reply: `• Still waiting on a yes/no — should I call and ask: “${pendingCallOffer.question}”?`,
+      action: 'confirm-call-offer',
+      pendingCallOffer,
+    };
+  }
+
   if (pending) {
     const delay = parseCallWhen(text);
     if (delay != null) {
@@ -202,6 +281,7 @@ export function handleChatTurn(
         from: 'caller',
         reply: `Got it — calling ${whenLabel}.${qBit}`,
         pendingAsk: null,
+        pendingCallOffer: null,
         dial: { delayMinutes: delay, questions: pending.questions },
       };
     }
@@ -236,22 +316,17 @@ export function handleChatTurn(
     };
   }
 
-  if (LIVE.test(text)) {
-    return {
-      from: 'concierge',
-      reply: `That needs a live answer from ${card.officeName}. Tell me to call and ask it — for example: “call and ask if the studio is free in August” — and I'll ask when to dial.`,
-    };
-  }
-  if (/\b(doc|document|bank|statement|i-?20|visa|passport)\b/i.test(text)) {
-    return {
-      from: 'concierge',
-      reply: 'Packet will handle that once the office asks for a renter packet.',
-    };
-  }
+  // Everything else → Gemini in the Workspace (docs + place context).
+  void card;
   return {
     from: 'concierge',
-    reply: "Got it! I'll pass that to the team. Want Caller on it? Say “call and ask …” plus your question.",
+    reply: '__gemini__',
   };
+}
+
+/** True when handleChatTurn deferred the reply to the Gemini chat action. */
+export function needsGeminiChat(turn: ChatTurnResult): boolean {
+  return turn.reply === '__gemini__';
 }
 
 /** @deprecated Prefer handleChatTurn — kept for older call sites / tests. */
@@ -294,17 +369,6 @@ export type CallHistoryRow = {
   error?: string;
 };
 
-/** Missed pickup vs hard failure (tech / cancel). */
-export function isMissedCall(row: Pick<CallHistoryRow, 'status' | 'error' | 'transcript' | 'answers'>): boolean {
-  if (row.status !== 'failed' && row.status !== 'done') return false;
-  const err = (row.error ?? '').toLowerCase();
-  if (err.startsWith('missed:') || /\bno[-_ ]?answer\b|\bbusy\b|\bmissed\b|\bdid not answer\b/.test(err)) {
-    return true;
-  }
-  if (row.status === 'failed' && row.transcript.length === 0 && !row.answers) return true;
-  return false;
-}
-
 function callOutcome(
   row: Pick<CallHistoryRow, 'status' | 'error' | 'transcript' | 'answers'>,
 ): LogEntry & { kind: 'call' } {
@@ -326,90 +390,6 @@ function callOutcome(
   return { kind: 'call', outcome: 'answered', example: false };
 }
 
-/** Drop system-prompt / meta lines that sometimes leak into the transcript. */
-function isJunkTranscriptLine(text: string): boolean {
-  const t = text.trim().toLowerCase();
-  if (t.length < 2) return true;
-  if (/^you are the how\.?zingg/i.test(t)) return true;
-  if (/\bai phone assistant\b/.test(t)) return true;
-  if (/\bsystem prompt\b/.test(t)) return true;
-  if (/\bcalling on behalf of a student\b/.test(t) && t.length > 160) return true;
-  if (/\bthis call is being recorded\b/.test(t) && !/\brent|special|ssn|available\b/.test(t)) return true;
-  return false;
-}
-
-function officeLines(transcript: CallHistoryRow['transcript']): string[] {
-  return transcript
-    .filter((l) => l.speaker === 'office' && !isJunkTranscriptLine(l.text))
-    .map((l) => l.text.trim());
-}
-
-function cleanFact(text: string, max = 140): string {
-  const t = text.replace(/\s+/g, ' ').trim();
-  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
-}
-
-/** Pull rent / specials / no-SSN / availability from structured answers + office speech. */
-export function collectCallFacts(row: CallHistoryRow): string[] {
-  const facts: string[] = [];
-  const a = row.answers;
-  const office = officeLines(row.transcript).join(' ');
-
-  let rent = typeof a?.rent === 'number' ? a.rent : undefined;
-  if (rent == null) {
-    const m = office.match(/\$?\s*(\d{3,5})\s*(?:\/\s*mo(?:nth)?|a month|per month)\b/i);
-    if (m) rent = Number(m[1]);
-  }
-  if (rent != null) facts.push(`Rent is about $${rent}/month.`);
-
-  const specials = a?.specials?.trim();
-  if (specials) {
-    facts.push(`Move-in special: ${cleanFact(specials)}.`);
-  } else {
-    const m = office.match(
-      /(?:special|discount|waive|free (?:first )?month)[^.!?]{0,100}[.!?]?/i,
-    );
-    if (m) facts.push(`Move-in special: ${cleanFact(m[0])}`);
-  }
-
-  const noSsn = a?.noSSNOptions?.trim();
-  if (noSsn) {
-    facts.push(`No-SSN / I-20: ${cleanFact(noSsn)}.`);
-  } else if (
-    /\b(no ssn|without (an? )?(ssn|social)|i-?20|international students?)\b/i.test(office)
-  ) {
-    facts.push('They accept applicants without a US Social Security number (I-20 / funding letter OK).');
-  } else if (/\b(need|require|must have).{0,30}(ssn|social security)\b/i.test(office)) {
-    facts.push('They require a US Social Security number.');
-  }
-
-  if (a?.availableDate) {
-    facts.push(`Available from ${a.availableDate}.`);
-  } else if (a?.available === true) {
-    facts.push('A unit is available.');
-  } else if (a?.available === false) {
-    facts.push('No unit available right now.');
-  } else if (/\b(available|we have (a )?unit|vacanc)/i.test(office)) {
-    facts.push('They said a unit is available — confirm dates on a follow-up.');
-  }
-
-  if (typeof a?.deposit === 'number') facts.push(`Deposit is about $${a.deposit}.`);
-  if (a?.fees?.trim()) facts.push(`Fees: ${cleanFact(a.fees)}.`);
-  if (a?.notes?.trim() && !isJunkTranscriptLine(a.notes)) {
-    facts.push(cleanFact(a.notes));
-  }
-
-  // Callback only from the office, with a clear minute request — never quote Caller prompts.
-  const minutes = detectCallbackMinutesFromTranscript(
-    row.transcript.filter((l) => l.speaker === 'office' && !isJunkTranscriptLine(l.text)),
-  );
-  if (minutes != null) {
-    facts.push(`They asked us to call back in ${minutes} minute${minutes === 1 ? '' : 's'}.`);
-  }
-
-  return facts;
-}
-
 /**
  * Concierge post-call note for the chatbot: plain facts (rent, what they accept, specials).
  * Never dumps system prompts or raw Caller lines.
@@ -422,11 +402,7 @@ export function summarizeCallForChat(row: CallHistoryRow): string {
     return "We couldn't connect. Tap the phone icon to retry, or schedule for later.";
   }
 
-  const facts = collectCallFacts(row);
-  if (facts.length === 0) {
-    return "Call ended. I don't have clear rent / specials / no-SSN answers yet — open the call for the transcript, or I can dial again.";
-  }
-  return `Here's what I got from the call:\n• ${facts.join('\n• ')}`;
+  return formatCallNotesChat(collectCallFacts(row));
 }
 
 /**
@@ -500,4 +476,63 @@ export function messagesFromCallHistory(
     }
   }
   return out;
+}
+
+export type OfficeDocHistoryRow = {
+  documentId: string;
+  placeSlug: string;
+  placeTitle: string;
+  fileName: string;
+  summary?: string;
+  status: string;
+  createdAt: number;
+  url?: string | null;
+  contentType?: string;
+};
+
+export type PlaceEmailHistoryRow = {
+  emailId: string;
+  placeSlug: string;
+  placeTitle: string;
+  kind: string;
+  toLabel: string;
+  reason: string;
+  createdAt: number;
+};
+
+/** Messenger log bubbles for office-uploaded documents. */
+export function messagesFromDocuments(rows: OfficeDocHistoryRow[]): ChatMessage[] {
+  return rows.map((row) => ({
+    id: `hist-doc-${row.documentId}`,
+    from: 'packet' as const,
+    text: row.summary
+      ? `Document received: ${row.fileName} · ${row.summary}`
+      : `Document received: ${row.fileName}`,
+    at: row.createdAt,
+    log: {
+      kind: 'document' as const,
+      fileName: row.fileName,
+      summary: row.summary,
+      href: `/app/docs/${row.documentId}`,
+      example: false,
+    },
+  }));
+}
+
+/** Messenger log bubbles for outbound emails (office doc request, etc.). */
+export function messagesFromPlaceEmails(rows: PlaceEmailHistoryRow[]): ChatMessage[] {
+  return rows
+    .filter((row) => row.kind === 'realty_doc_request')
+    .map((row) => ({
+      id: `hist-email-${row.emailId}`,
+      from: 'packet' as const,
+      text: `Emailed the office — ${row.reason}`,
+      at: row.createdAt,
+      log: {
+        kind: 'email' as const,
+        to: row.toLabel,
+        reason: row.reason,
+        example: false,
+      },
+    }));
 }

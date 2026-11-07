@@ -7,7 +7,6 @@ import {
   handleChatTurn,
   messagesFromCallHistory,
   parseCallWhen,
-  replyTo,
   scriptFor,
   STEPS,
   summarizeCallForChat,
@@ -34,8 +33,12 @@ describe('place conversation', () => {
     expect(formatDuration(3730)).toBe('1:02:10');
   });
 
-  it('never guesses live answers when you ask — steers you to call-and-ask', () => {
-    expect(replyTo('Is it available on Aug 14?', card)).toMatch(/call and ask|live answer/i);
+  it('defers ordinary questions to Gemini (does not dial)', () => {
+    const turn = handleChatTurn('Is it available on Aug 14?', card, null);
+    expect(turn.reply).toBe('__gemini__');
+    expect(turn.dial).toBeUndefined();
+    expect(extractCallQuestions('What is the rent?')).toBeNull();
+    expect(extractCallQuestions('ask them if pets are allowed')).not.toBeNull();
   });
 
   it('extracts call questions and asks when, then dials on a when-reply', () => {

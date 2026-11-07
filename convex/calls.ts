@@ -35,10 +35,11 @@ import {
   DEFAULT_CALL_QUESTIONS,
   startsWithDisclosure,
 } from '../lib/rules';
+import { collectCallFacts } from '../lib/callFacts';
 import transcripts from '../seed/transcripts.json';
 
 const LINE_MS = 1200;
-const MAX_DURATION_SECONDS = 180;
+const MAX_DURATION_SECONDS = 360;
 
 type TranscriptLine = { speaker: 'caller' | 'office'; text: string; at: number };
 
@@ -132,10 +133,24 @@ function parseAnswers(data: Record<string, unknown> | undefined) {
     const n = Number(rentRaw.replace(/[^0-9.]/g, ''));
     if (Number.isFinite(n) && n > 0) rent = n;
   }
-  const specials = typeof data.specials === 'string' ? data.specials : undefined;
-  const noSSNOptions = typeof data.noSSNOptions === 'string' ? data.noSSNOptions : undefined;
-  if (rent === undefined && !specials && !noSSNOptions) return undefined;
-  return { rent, specials, noSSNOptions };
+  const specials = typeof data.specials === 'string' ? data.specials.trim() : undefined;
+  const noSSNOptions =
+    typeof data.noSSNOptions === 'string' ? data.noSSNOptions.trim() : undefined;
+  const availableDate =
+    typeof data.availableDate === 'string' ? data.availableDate.trim() : undefined;
+  const fees = typeof data.fees === 'string' ? data.fees.trim() : undefined;
+  const notes = typeof data.notes === 'string' ? data.notes.trim() : undefined;
+  if (
+    rent === undefined &&
+    !specials &&
+    !noSSNOptions &&
+    !availableDate &&
+    !fees &&
+    !notes
+  ) {
+    return undefined;
+  }
+  return { rent, specials, noSSNOptions, availableDate, fees, notes };
 }
 
 /** Detect Caller closing the conversation so we can hang up from our side too. */
@@ -143,10 +158,10 @@ function looksLikeAgentHangup(transcript: TranscriptLine[]): boolean {
   const lastCaller = [...transcript].reverse().find((l) => l.speaker === 'caller');
   if (!lastCaller) return false;
   const t = lastCaller.text.toLowerCase();
+  // Only clear goodbyes — mid-call “thanks” must not force hang-up.
   return (
-    /\b(goodbye|good bye|bye for now|have a (good|nice) day|talk soon)\b/.test(t) ||
-    /\bthank you for your time\b/.test(t) ||
-    /\bthat('| i)?s all (i|we) needed\b/.test(t)
+    /\b(goodbye|good bye|bye for now)\b/.test(t) ||
+    /\b(have a (good|nice) (day|one)[,.]?\s*(goodbye|bye)?)\s*$/.test(t)
   );
 }
 
@@ -170,6 +185,45 @@ export const get = query({
 export const internalGet = internalQuery({
   args: { callId: v.id('calls') },
   handler: async (ctx, { callId }) => ctx.db.get(callId),
+});
+
+/** Recent call notes for a place — fed into Guide chat context. */
+export const listCallContext = internalQuery({
+  args: { userId: v.id('users'), placeSlug: v.string() },
+  handler: async (ctx, { userId, placeSlug }) => {
+    const interests = await ctx.db
+      .query('placeInterests')
+      .withIndex('by_user', (q) => q.eq('userId', userId))
+      .collect();
+    const forPlace = interests.filter((i) => i.placeSlug === placeSlug);
+    const interestIds = new Set(forPlace.map((i) => i._id));
+    const calls = await ctx.db
+      .query('calls')
+      .withIndex('by_user', (q) => q.eq('userId', userId))
+      .collect();
+    const relevant = calls
+      .filter(
+        (c) =>
+          (c.interestId && interestIds.has(c.interestId)) ||
+          forPlace.some((i) => i.callId === c._id || i.scheduledCallId === c._id),
+      )
+      .filter((c) => c.status === 'done' || c.status === 'failed')
+      .sort((a, b) => (b.endedAt ?? b.startedAt ?? 0) - (a.endedAt ?? a.startedAt ?? 0))
+      .slice(0, 4);
+
+    return relevant.map((c) => ({
+      callId: c._id,
+      status: c.status,
+      facts: collectCallFacts({
+        status: c.status,
+        transcript: c.transcript ?? [],
+        answers: c.answers,
+        error: c.error,
+        questions: c.questions,
+      }),
+      endedAt: c.endedAt,
+    }));
+  },
 });
 
 export const demoUserId = internalQuery({
@@ -489,6 +543,7 @@ export const mockTick = internalMutation({
           });
         }
       }
+      await ctx.scheduler.runAfter(0, internal.callSummarize.summarizeEndedCall, { callId });
       return;
     }
 
@@ -962,6 +1017,36 @@ export const fetchRecording = internalAction({
   },
 });
 
+/** Pull final Vapi transcript/answers after the call is already marked done. */
+export const refreshEndedCallArtifact = internalAction({
+  args: { callId: v.id('calls') },
+  handler: async (ctx, { callId }) => {
+    const call = await ctx.runQuery(internal.calls.internalGet, { callId });
+    if (!call?.externalId || call.externalId.startsWith('mock-')) return;
+    if (call.mode === 'mock') return;
+    const voice = createVapiVoice();
+    if (!voice) return;
+    try {
+      const snap = await voice.getCall(call.externalId);
+      const startedAt = call.startedAt ?? Date.now();
+      const transcript = mapMessages(snap.messages, startedAt);
+      const answers = parseAnswers(snap.structuredData);
+      if (transcript.length || answers) {
+        await ctx.runMutation(internal.calls.patchCall, {
+          callId,
+          transcript: transcript.length ? transcript : undefined,
+          answers: {
+            ...(call.answers ?? {}),
+            ...(answers ?? {}),
+          },
+        });
+      }
+    } catch (err) {
+      console.warn('[calls.refreshEndedCallArtifact]', err);
+    }
+  },
+});
+
 export const syncCall = action({
   args: { callId: v.id('calls') },
   handler: async (
@@ -975,8 +1060,32 @@ export const syncCall = action({
     }
 
     const alreadyEnded = call.status === 'done' || call.status === 'failed';
-    // Still try to pull the recording after end if we don't have a playable copy yet.
+    const voice = createVapiVoice();
+
+    // After hang-up, still pull final transcript / structured answers (Vapi finalizes late).
     if (alreadyEnded) {
+      const thinTranscript = (call.transcript?.length ?? 0) < 2;
+      const thinAnswers = !call.answers?.notes && !call.answers?.rent && !call.answers?.specials;
+      if (voice && call.externalId && !call.externalId.startsWith('mock-') && (thinTranscript || thinAnswers)) {
+        try {
+          const snap = await voice.getCall(call.externalId);
+          const startedAt = call.startedAt ?? Date.now();
+          const transcript = mapMessages(snap.messages, startedAt);
+          const answers = parseAnswers(snap.structuredData);
+          if (transcript.length > (call.transcript?.length ?? 0) || answers) {
+            await ctx.runMutation(internal.calls.patchCall, {
+              callId,
+              transcript: transcript.length ? transcript : undefined,
+              answers: {
+                ...(call.answers ?? {}),
+                ...(answers ?? {}),
+              },
+            });
+          }
+        } catch (err) {
+          console.warn('[calls.syncCall] post-end transcript refresh', err);
+        }
+      }
       if (!call.recordingStorageId && call.recordingStatus !== 'unavailable') {
         await ctx.scheduler.runAfter(0, internal.calls.fetchRecording, { callId, attempt: 0 });
       }
@@ -987,7 +1096,6 @@ export const syncCall = action({
       };
     }
 
-    const voice = createVapiVoice();
     if (!voice) return { status: call.status, ended: false };
 
     const snap = await voice.getCall(call.externalId);
@@ -996,7 +1104,6 @@ export const syncCall = action({
     const transcript = mapMessages(snap.messages, startedAt);
     const answers = parseAnswers(snap.structuredData);
     let ended = status === 'done' || status === 'failed';
-
     // Agent-side auto hang-up: if Caller said goodbye but the line is still open, end it.
     const controlUrl = snap.controlUrl ?? call.controlUrl;
     if (!ended && (status === 'live' || status === 'ringing') && looksLikeAgentHangup(transcript)) {
@@ -1058,6 +1165,11 @@ export const syncCall = action({
       }
     }
 
+    if (justEnded) {
+      // Gemini notes → chat bullets, then student/realty emails.
+      await ctx.scheduler.runAfter(0, internal.callSummarize.summarizeEndedCall, { callId });
+    }
+
     return { status, ended, recordingStatus: ended ? 'pending' : call.recordingStatus };
   },
 });
@@ -1093,6 +1205,9 @@ export const endCall = action({
     if (call.mode === 'vapi') {
       await ctx.scheduler.runAfter(2000, internal.calls.fetchRecording, { callId, attempt: 0 });
     }
+
+    // Delay so Vapi can finalize messages before Gemini notes.
+    await ctx.scheduler.runAfter(2500, internal.callSummarize.summarizeEndedCall, { callId });
   },
 });
 

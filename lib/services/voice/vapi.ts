@@ -118,19 +118,13 @@ export function buildCallerAssistant(params: OutboundCallParams) {
     name: 'how.zingg Caller',
     firstMessage: params.firstMessage,
     firstMessageMode: 'assistant-speaks-first' as const,
-    maxDurationSeconds: params.maxDurationSeconds ?? 180,
+    maxDurationSeconds: params.maxDurationSeconds ?? 360,
     // Agent can hang up itself when done / refused / voicemail.
     endCallFunctionEnabled: true,
-    endCallMessage: 'Thank you for your time. Goodbye.',
-    endCallPhrases: [
-      'goodbye',
-      'good bye',
-      'have a good day',
-      'have a nice day',
-      "that's all i needed",
-      'thank you for your time',
-    ],
-    silenceTimeoutSeconds: 25,
+    endCallMessage: 'Thanks again — goodbye.',
+    // Only clear goodbyes — polite mid-call thanks must NOT auto-end the call.
+    endCallPhrases: ['goodbye', 'good bye', 'bye for now'],
+    silenceTimeoutSeconds: 45,
     model: {
       provider: 'openai' as const,
       model: 'gpt-4o-mini',
@@ -155,7 +149,7 @@ export function buildCallerAssistant(params: OutboundCallParams) {
           properties: {
             rent: {
               type: 'string',
-              description: 'Monthly rent for a 1 bedroom if they stated it; otherwise omit',
+              description: 'Monthly rent if they stated it; otherwise omit',
             },
             specials: {
               type: 'string',
@@ -165,6 +159,19 @@ export function buildCallerAssistant(params: OutboundCallParams) {
               type: 'string',
               description:
                 'Whether they accept applicants without a US SSN, and what they accept instead',
+            },
+            availableDate: {
+              type: 'string',
+              description: 'Earliest move-in / availability date if they stated it; otherwise omit',
+            },
+            fees: {
+              type: 'string',
+              description: 'Application, admin, deposit, or other fees if stated; otherwise omit',
+            },
+            notes: {
+              type: 'string',
+              description:
+                'Other useful facts: application process steps, documents needed, pet/parking/utilities, approvals timing',
             },
             callbackMinutes: {
               type: 'number',

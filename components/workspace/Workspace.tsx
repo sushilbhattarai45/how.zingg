@@ -30,11 +30,13 @@ import type { Id } from '@/convex/_generated/dataModel';
 import Image from 'next/image';
 import { SwipeDeck } from '@/components/swipe/SwipeDeck';
 import { CallOptionsSheet } from '@/components/calls/CallOptionsSheet';
+import { StudentPacketPanel } from '@/components/packet/StudentPacketPanel';
 import { BotAvatar } from '@/components/ui/BotAvatar';
 import { AgentDot } from '@/components/ui/AgentDot';
 import { AGENTS, AGENT_COLOR } from '@/content/agents';
 import { placeBySlug, type SwipeCard } from '@/lib/swipeDeck';
 import { getGuestKey } from '@/lib/guestKey';
+import { readTripProfile } from '@/lib/studentPacket';
 import {
   clearThreadCache,
   mergeMessages,
@@ -46,11 +48,17 @@ import {
   formatDuration,
   handleChatTurn,
   messagesFromCallHistory,
+  messagesFromDocuments,
+  messagesFromPlaceEmails,
+  needsGeminiChat,
   scriptFor,
   type AgentName,
   type CallHistoryRow,
   type ChatMessage,
+  type OfficeDocHistoryRow,
+  type PlaceEmailHistoryRow,
   type PendingCallAsk,
+  type PendingCallOffer,
 } from '@/lib/conversation';
 import { useRouter } from 'next/navigation';
 
@@ -78,6 +86,7 @@ type Place = {
   status: string;
   typing: AgentName | null;
   pendingAsk: PendingCallAsk | null;
+  pendingCallOffer: PendingCallOffer | null;
 };
 
 const nameOf = (a: AgentName) => AGENTS.find((x) => x.id === a)!.name;
@@ -150,6 +159,21 @@ export function Workspace() {
   const upsertThread = useMutation(api.places.upsertThread);
 
   useEffect(() => setGuestKey(getGuestKey()), []);
+  const syncTrip = useMutation(api.packet.syncTripProfile);
+  useEffect(() => {
+    if (!guestKey) return;
+    const trip = readTripProfile();
+    if (!trip.name && !trip.moveIn && !trip.country && !trip.whatsapp) return;
+    void syncTrip({
+      guestKey,
+      name: trip.name,
+      whatsapp: trip.whatsapp,
+      homeCountry: trip.country,
+      arrivalDate: trip.moveIn,
+      hasSSN: trip.hasSSN ?? null,
+      budgetMax: trip.budgetMax ?? null,
+    }).catch(() => {});
+  }, [guestKey, syncTrip]);
 
   const saved = useQuery(api.places.listMine, guestKey ? { guestKey } : 'skip') as
     | {
@@ -229,6 +253,7 @@ export function Workspace() {
           typing: existing?.typing ?? null,
           pendingAsk:
             existing?.pendingAsk ?? server?.pendingAsk ?? cached?.pendingAsk ?? null,
+          pendingCallOffer: existing?.pendingCallOffer ?? null,
         };
         next.push(place);
         hydratedThreads.current.add(row.placeSlug);
@@ -309,12 +334,13 @@ export function Workspace() {
         last.text.trim() === nextMsg.text.trim() &&
         nextMsg.at - last.at < 2000
       ) {
-        return { ...p, ...extra, typing: null };
+        // `extra` last so callers can keep a typing indicator (e.g. waiting on Gemini).
+        return { ...p, typing: null, ...extra };
       }
       return {
         ...p,
-        ...extra,
         typing: null,
+        ...extra,
         messages: mergeMessages(p.messages, [nextMsg]),
       };
     });
@@ -345,6 +371,7 @@ export function Workspace() {
         status: 'Added',
         typing: null,
         pendingAsk: null,
+        pendingCallOffer: null,
       },
       ...ps,
     ]);
@@ -422,6 +449,7 @@ export function Workspace() {
   const router = useRouter();
   const callSaved = useAction(api.places.callSaved);
   const scheduleCall = useAction(api.places.scheduleCall);
+  const geminiReply = useAction(api.chat.replyAboutPlace);
 
   const runDial = async (
     place: Place,
@@ -467,8 +495,72 @@ export function Workspace() {
   const applyChatTurn = (slug: string, text: string, asYou: boolean) => {
     const place = places.find((p) => p.card.slug === slug);
     if (!place) return;
+    // Don't stack Gemini requests while one is in flight.
+    if (place.typing && asYou) return;
+
+    const turn = handleChatTurn(text, place.card, place.pendingAsk, place.pendingCallOffer);
+
+    if (needsGeminiChat(turn)) {
+      // Show typing immediately with the user bubble (post used to wipe typing).
+      if (asYou) post(slug, { from: 'you', text }, { typing: 'concierge', status: 'Guide is thinking…' });
+      else update(slug, (p) => ({ ...p, typing: 'concierge', status: 'Guide is thinking…' }));
+
+      void (async () => {
+        try {
+          const recent = place.messages
+            .filter((m) => !m.log)
+            .slice(-8)
+            .map((m) => ({ from: String(m.from), text: m.text }));
+          const res = await geminiReply({
+            guestKey: getGuestKey(),
+            placeSlug: place.card.slug,
+            placeTitle: place.card.title,
+            unitType: place.card.unitType,
+            officeName: place.card.officeName,
+            address: place.card.address,
+            walkMin: place.card.walkMin,
+            pitch: place.card.pitch,
+            noSSN: place.card.noSSN,
+            availableFrom: place.card.availableFrom,
+            message: text,
+            recent,
+          });
+          update(slug, (p) => ({
+            ...p,
+            typing: null,
+            status: 'On your list',
+            pendingCallOffer: res.callOffer ? { question: res.callOffer } : null,
+            messages: mergeMessages(p.messages, [
+              {
+                id: `${slug}:msg:${res.from}:${Date.now()}`,
+                from: res.from,
+                text: res.reply,
+                action: res.callOffer ? 'confirm-call-offer' : undefined,
+                at: Date.now(),
+              },
+            ]),
+          }));
+        } catch {
+          update(slug, (p) => ({
+            ...p,
+            typing: null,
+            status: 'On your list',
+            messages: mergeMessages(p.messages, [
+              {
+                id: `${slug}:msg:concierge:${Date.now()}`,
+                from: 'concierge',
+                text: '• I couldn’t answer that just now.\n• Try again, or say “call and ask …” to dial the office.',
+                at: Date.now(),
+              },
+            ]),
+          }));
+        }
+      })();
+      return;
+    }
+
     if (asYou) post(slug, { from: 'you', text });
-    const turn = handleChatTurn(text, place.card, place.pendingAsk);
+
     timers.current.push(
       window.setTimeout(() => update(slug, (p) => ({ ...p, typing: turn.from })), reduced ? 0 : 400),
       window.setTimeout(() => {
@@ -476,6 +568,8 @@ export function Workspace() {
           ...p,
           typing: null,
           pendingAsk: turn.pendingAsk === undefined ? p.pendingAsk : turn.pendingAsk,
+          pendingCallOffer:
+            turn.pendingCallOffer === undefined ? p.pendingCallOffer : turn.pendingCallOffer,
           status: turn.dial
             ? turn.dial.delayMinutes <= 0
               ? 'Calling…'
@@ -504,6 +598,10 @@ export function Workspace() {
     const label =
       minutes <= 0 ? 'now' : minutes === 60 ? 'in 1 hour' : `in ${minutes} min`;
     applyChatTurn(slug, label, true);
+  };
+
+  const confirmCallOffer = (slug: string, yes: boolean) => {
+    applyChatTurn(slug, yes ? 'yes' : 'no', true);
   };
 
   const current = places.find((p) => p.card.slug === selected) ?? null;
@@ -607,6 +705,9 @@ export function Workspace() {
         realLogs={current ? (realLogs[current.card.slug] ?? []) : []}
         onSend={send}
         onPickWhen={current ? (mins) => pickWhen(current.card.slug, mins) : undefined}
+        onConfirmCallOffer={
+          current ? (yes) => confirmCallOffer(current.card.slug, yes) : undefined
+        }
         onRemove={current ? () => void remove(current.card.slug) : undefined}
         onScheduleCall={current ? () => openCallSheetFor(current) : undefined}
         removing={removing === current?.card.slug}
@@ -769,16 +870,31 @@ function Progress({ step, labels }: { step: number; labels?: boolean }) {
 
 /* ───────────── Real call logs (full history per place) ───────────── */
 
-/** Every call for each place, as messenger log rows + Caller notes. */
+/** Every call + office email + document for each place, as messenger log rows. */
 function useRealCallLogs(guestKey: string | undefined): Record<string, ChatMessage[]> {
   const history = useQuery(api.places.listCallHistory, guestKey ? { guestKey } : 'skip') as
     | Record<string, CallHistoryRow[]>
     | undefined;
+  const docs = useQuery(api.documents.listMineByPlace, guestKey ? { guestKey } : 'skip') as
+    | Record<string, OfficeDocHistoryRow[]>
+    | undefined;
+  const emails = useQuery(api.documents.listEmailsByPlace, guestKey ? { guestKey } : 'skip') as
+    | Record<string, PlaceEmailHistoryRow[]>
+    | undefined;
   const out: Record<string, ChatMessage[]> = {};
-  if (!history) return out;
   const tz = typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC';
-  for (const [slug, rows] of Object.entries(history)) {
-    out[slug] = messagesFromCallHistory(rows, { userTz: tz });
+  const slugs = new Set([
+    ...Object.keys(history ?? {}),
+    ...Object.keys(docs ?? {}),
+    ...Object.keys(emails ?? {}),
+  ]);
+  for (const slug of slugs) {
+    const callMsgs = history?.[slug] ? messagesFromCallHistory(history[slug]!, { userTz: tz }) : [];
+    const emailMsgs = emails?.[slug] ? messagesFromPlaceEmails(emails[slug]!) : [];
+    const docMsgs = docs?.[slug] ? messagesFromDocuments(docs[slug]!) : [];
+    out[slug] = mergeMessages(callMsgs, emailMsgs, docMsgs).sort(
+      (a, b) => a.at - b.at || a.id.localeCompare(b.id),
+    );
   }
   return out;
 }
@@ -806,6 +922,7 @@ function Conversation({
   realLogs,
   onSend,
   onPickWhen,
+  onConfirmCallOffer,
   onRemove,
   onScheduleCall,
   removing,
@@ -814,12 +931,13 @@ function Conversation({
   realLogs: ChatMessage[];
   onSend: (slug: string, text: string) => void;
   onPickWhen?: (minutes: number) => void;
+  onConfirmCallOffer?: (yes: boolean) => void;
   onRemove?: () => void;
   onScheduleCall?: () => void;
   removing?: boolean;
 }) {
   const [draft, setDraft] = useState('');
-  const [docsNote, setDocsNote] = useState(false);
+  const [packetOpen, setPacketOpen] = useState(false);
   const end = useRef<HTMLDivElement>(null);
   const thread = place ? mergeMessages(place.messages, realLogs) : [];
 
@@ -851,6 +969,7 @@ function Conversation({
   ).length;
 
   return (
+    <>
     <aside
       aria-label={`Conversation about ${card.title}`}
       className="order-3 flex min-h-[560px] flex-col overflow-hidden rounded-[20px] border border-line bg-surface lg:order-none lg:min-h-0"
@@ -879,6 +998,15 @@ function Conversation({
             </a>
           </p>
         </div>
+        <button
+          type="button"
+          aria-label="Manage application documents"
+          onClick={() => setPacketOpen(true)}
+          className="grid size-9 shrink-0 place-items-center rounded-full border border-line bg-raised text-chalk hover:bg-window-dim"
+          title="Your packet — upload & share with office"
+        >
+          <Upload size={15} aria-hidden />
+        </button>
         {onScheduleCall && (
           <button
             type="button"
@@ -998,19 +1126,33 @@ function Conversation({
                               ))}
                             </span>
                           )}
-                          {m.action === 'add-documents' &&
-                            (docsNote ? (
-                              <span className="mt-2 block text-[12px] leading-4 text-text-3">
-                                Document upload arrives in the next build.
-                              </span>
-                            ) : (
+                          {m.action === 'confirm-call-offer' && onConfirmCallOffer && (
+                            <span className="mt-2 flex flex-wrap gap-1.5">
                               <button
-                                onClick={() => setDocsNote(true)}
+                                type="button"
+                                onClick={() => onConfirmCallOffer(true)}
+                                className="flex min-h-9 items-center gap-1 rounded-full border border-window/50 bg-window-dim px-3 text-[12px] font-bold text-good hover:bg-window/20"
+                              >
+                                <Phone size={12} aria-hidden /> Yes, call them
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onConfirmCallOffer(false)}
+                                className="flex min-h-9 items-center gap-1 rounded-full border border-line bg-surface px-3 text-[12px] font-bold hover:bg-ink/40"
+                              >
+                                No thanks
+                              </button>
+                            </span>
+                          )}
+                          {m.action === 'add-documents' && (
+                              <button
+                                type="button"
+                                onClick={() => setPacketOpen(true)}
                                 className="mt-2 flex min-h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-[12px] font-bold hover:bg-ink/40"
                               >
                                 <Upload size={13} aria-hidden /> Add documents
                               </button>
-                            ))}
+                            )}
                         </div>
                       </div>
                     </div>
@@ -1023,14 +1165,17 @@ function Conversation({
             );
           })}
           {place.typing && (
-            <li className="mt-3 flex items-end gap-2">
+            <li className="mt-3 flex items-end gap-2" aria-live="polite">
               <BotAvatar
                 color={AGENT_COLOR[place.typing]}
                 mood="thinking"
                 size={28}
                 label={`${nameOf(place.typing)} is typing`}
               />
-              <span className="flex h-9 items-center rounded-[18px] rounded-bl-[6px] bg-raised px-3.5">
+              <span className="flex min-h-9 flex-col justify-center gap-0.5 rounded-[18px] rounded-bl-[6px] bg-raised px-3.5 py-2">
+                <span className="text-[11px] leading-3 font-bold text-text-3">
+                  {nameOf(place.typing)} is thinking…
+                </span>
                 <TypingDots color={AGENT_COLOR[place.typing]} />
               </span>
             </li>
@@ -1044,7 +1189,7 @@ function Conversation({
         onSubmit={(e) => {
           e.preventDefault();
           const t = draft.trim();
-          if (!t) return;
+          if (!t || place.typing) return;
           onSend(card.slug, t);
           setDraft('');
         }}
@@ -1057,19 +1202,27 @@ function Conversation({
           id="msg"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="Aa"
-          className="h-10 min-w-0 flex-1 rounded-full bg-raised px-4 text-[14px] font-semibold outline-none placeholder:text-text-3 focus:ring-2 focus:ring-line"
+          placeholder={place.typing ? `${nameOf(place.typing)} is thinking…` : 'Aa'}
+          disabled={Boolean(place.typing)}
+          className="h-10 min-w-0 flex-1 rounded-full bg-raised px-4 text-[14px] font-semibold outline-none placeholder:text-text-3 focus:ring-2 focus:ring-line disabled:opacity-60"
         />
         <button
           type="submit"
           aria-label="Send"
-          disabled={!draft.trim()}
+          disabled={!draft.trim() || Boolean(place.typing)}
           className="grid size-10 shrink-0 place-items-center rounded-full text-chalk hover:bg-raised disabled:text-text-3"
         >
           <ArrowUp size={18} strokeWidth={2.5} />
         </button>
       </form>
     </aside>
+    <StudentPacketPanel
+      open={packetOpen}
+      onClose={() => setPacketOpen(false)}
+      placeSlug={card.slug}
+      placeTitle={card.title}
+    />
+    </>
   );
 }
 
@@ -1097,8 +1250,16 @@ function LogRow({ m }: { m: ChatMessage }) {
   let tone = 'bg-raised text-chalk';
   if (log.kind === 'email') {
     Icon = Mail;
-    title = 'Email sent';
-    detail = `To ${log.to} · ${whenShort}`;
+    title = 'Email sent to office';
+    detail = log.reason
+      ? `${log.reason} · ${whenShort}`
+      : `To ${log.to} · ${whenShort}`;
+  } else if (log.kind === 'document') {
+    Icon = Upload;
+    title = 'Document received';
+    detail = log.summary
+      ? `${log.fileName} · ${log.summary}`
+      : `${log.fileName} · tap to view · ${whenShort}`;
   } else {
     const dur = log.durationSec !== undefined ? formatDuration(log.durationSec) : null;
     switch (log.outcome) {
@@ -1146,19 +1307,25 @@ function LogRow({ m }: { m: ChatMessage }) {
       <span className="min-w-0 flex-1">
         <span className="block text-[14px] leading-5 font-bold">
           {title}
-          {log.example && <span className="ml-1.5 text-[11px] font-bold text-text-3">Example</span>}
+          {'example' in log && log.example && (
+            <span className="ml-1.5 text-[11px] font-bold text-text-3">Example</span>
+          )}
         </span>
         <span className="tabular block text-[12px] leading-4 text-text-3">
           {nameOf(m.from as AgentName)} · {detail}
         </span>
       </span>
-      {log.kind === 'call' && log.href && <ChevronRight size={16} className="shrink-0 text-text-3" aria-hidden />}
+      {(log.kind === 'call' || log.kind === 'document') && 'href' in log && log.href && (
+        <ChevronRight size={16} className="shrink-0 text-text-3" aria-hidden />
+      )}
     </span>
   );
+  const href =
+    (log.kind === 'call' || log.kind === 'document') && 'href' in log ? log.href : undefined;
   return (
     <div className="mx-auto w-full max-w-[320px]">
-      {log.kind === 'call' && log.href ? (
-        <Link href={log.href} className="block hover:opacity-90">
+      {href ? (
+        <Link href={href} className="block hover:opacity-90">
           {body}
         </Link>
       ) : (

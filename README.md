@@ -55,6 +55,35 @@ Also put the same values in `.env.local` (see `.env.example`) so Next and docs s
 - First message always uses the AI disclosure from `lib/rules.ts`.
 - `maxDurationSeconds: 180`.
 
+## Gemini (chat + document scrape)
+
+Guide answers place chat with **Gemini**, using office-uploaded docs and the saved unit type (so a 2-bed interest ignores 4-bed floor-plan noise). Caller only dials when you explicitly say e.g. `call and ask …`, `call them about …`, or `ask them …`.
+
+```bash
+npx convex env set GEMINI_API_KEY your-key
+npx convex env set GEMINI_MODEL gemini-3.8-flash
+```
+
+Gemini chat/doc scrape runs even when `DEMO_MODE=1` (voice can stay mocked). Without a Gemini key, chat uses a local mock that only summarizes already-extracted facts.
+
+## Email notify + office doc upload (Ehulak)
+
+After Caller finishes a call, Convex emails:
+
+1. **Student** (`STUDENT_NOTIFY_EMAIL`, default `sushilbhattarai2004@gmail.com`) — keypoints from the call.
+2. **Realty** (`REALTY_NOTIFY_EMAIL`, default `sushilbhattarai0054@gmail.com`) — unique upload link `/office/upload/{token}`.
+
+When the office uploads a file, Packet extracts keypoints, emails the student again, and shows a document log row in the place chat.
+
+```bash
+npx convex env set EHULAK_API_KEY your-key
+npx convex env set STUDENT_NOTIFY_EMAIL sushilbhattarai2004@gmail.com
+npx convex env set REALTY_NOTIFY_EMAIL sushilbhattarai0054@gmail.com
+npx convex env set NEXT_PUBLIC_SITE_URL http://localhost:3000
+```
+
+Notify sends whenever `EHULAK_API_KEY` is set (even if `DEMO_MODE=1`). Without a key, emails are mocked but still written to the `emails` table.
+
 ## Scripts
 
 | Script | What |

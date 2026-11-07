@@ -254,6 +254,10 @@ export default defineSchema({
     callbackScheduled: v.optional(v.boolean()),
     /** True after one guardrail bump so we only reschedule a blocked job once. */
     guardrailRescheduled: v.optional(v.boolean()),
+    /** Student keypoints email sent after this call ended. */
+    notifyEmailSentAt: v.optional(v.number()),
+    /** Realty doc-request email (with upload link) sent after this call. */
+    docRequestEmailSentAt: v.optional(v.number()),
   })
     .index('by_user', ['userId'])
     .index('by_office', ['officeId'])
@@ -265,7 +269,7 @@ export default defineSchema({
 
   emails: defineTable({
     userId: v.id('users'),
-    officeId: v.id('offices'),
+    officeId: v.optional(v.id('offices')),
     direction: v.union(v.literal('out'), v.literal('in')),
     subject: v.string(),
     body: v.string(),
@@ -274,10 +278,17 @@ export default defineSchema({
     approved: v.boolean(),
     threadId: v.string(),
     createdAt: v.number(),
+    /** student_notify | realty_doc_request | student_doc_received */
+    kind: v.optional(v.string()),
+    placeSlug: v.optional(v.string()),
+    placeTitle: v.optional(v.string()),
+    /** Short reason shown in chat (e.g. “asked for floor plan / packet”). */
+    reason: v.optional(v.string()),
   })
     .index('by_user', ['userId'])
     .index('by_office', ['officeId'])
-    .index('by_thread', ['threadId']),
+    .index('by_thread', ['threadId'])
+    .index('by_user_slug', ['userId', 'placeSlug']),
 
   documents: defineTable({
     userId: v.id('users'),
@@ -294,9 +305,52 @@ export default defineSchema({
     fileName: v.optional(v.string()),
     extracted: v.optional(v.record(v.string(), v.string())),
     status: v.union(v.literal('uploaded'), v.literal('read'), v.literal('needs_review')),
+    callId: v.optional(v.id('calls')),
+    interestId: v.optional(v.id('placeInterests')),
+    officeId: v.optional(v.id('offices')),
+    placeSlug: v.optional(v.string()),
+    placeTitle: v.optional(v.string()),
+    source: v.optional(v.union(v.literal('office_upload'), v.literal('student'), v.literal('seed'))),
+    summary: v.optional(v.string()),
+    contentType: v.optional(v.string()),
+    createdAt: v.optional(v.number()),
   })
     .index('by_user', ['userId'])
-    .index('by_status', ['status']),
+    .index('by_status', ['status'])
+    .index('by_user_slug', ['userId', 'placeSlug'])
+    .index('by_call', ['callId']),
+
+  /** Unique link for a realty office to upload docs after a call. */
+  docUploadTokens: defineTable({
+    token: v.string(),
+    userId: v.id('users'),
+    callId: v.id('calls'),
+    interestId: v.optional(v.id('placeInterests')),
+    officeId: v.optional(v.id('offices')),
+    placeSlug: v.string(),
+    placeTitle: v.string(),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    usedAt: v.optional(v.number()),
+    uploadCount: v.optional(v.number()),
+  })
+    .index('by_token', ['token'])
+    .index('by_call', ['callId']),
+
+  /** Private 5-day link for a leasing office to view the student's packet. */
+  packetViewTokens: defineTable({
+    token: v.string(),
+    userId: v.id('users'),
+    placeSlug: v.optional(v.string()),
+    placeTitle: v.optional(v.string()),
+    officeId: v.optional(v.id('offices')),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    viewCount: v.optional(v.number()),
+    lastViewedAt: v.optional(v.number()),
+  })
+    .index('by_token', ['token'])
+    .index('by_user', ['userId']),
 
   packets: defineTable({
     userId: v.id('users'),
