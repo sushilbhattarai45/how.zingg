@@ -9,9 +9,24 @@
     "timeZone": "America/Chicago",
     "ready": true,
     "buildings": [
-      { "id": "scianna", "name": "Scianna Hall", "lat": 31.3297, "lng": -89.3337 },
-      { "id": "cook", "name": "Cook Library", "lat": 31.329, "lng": -89.3334 },
-      { "id": "cochran", "name": "Thad Cochran Center", "lat": 31.3283, "lng": -89.333 }
+      {
+        "id": "scianna",
+        "name": "Scianna Hall",
+        "lat": 31.3297,
+        "lng": -89.3337
+      },
+      {
+        "id": "cook",
+        "name": "Cook Library",
+        "lat": 31.329,
+        "lng": -89.3334
+      },
+      {
+        "id": "cochran",
+        "name": "Thad Cochran Center",
+        "lat": 31.3283,
+        "lng": -89.333
+      }
     ]
   },
   {
@@ -24,9 +39,24 @@
     "timeZone": "America/Chicago",
     "ready": false,
     "buildings": [
-      { "id": "lee", "name": "Lee Hall", "lat": 33.4561, "lng": -88.7929 },
-      { "id": "mitchell", "name": "Mitchell Memorial Library", "lat": 33.4542, "lng": -88.7951 },
-      { "id": "colvard", "name": "Colvard Student Union", "lat": 33.4546, "lng": -88.7894 }
+      {
+        "id": "lee",
+        "name": "Lee Hall",
+        "lat": 33.4561,
+        "lng": -88.7929
+      },
+      {
+        "id": "mitchell",
+        "name": "Mitchell Memorial Library",
+        "lat": 33.4542,
+        "lng": -88.7951
+      },
+      {
+        "id": "colvard",
+        "name": "Colvard Student Union",
+        "lat": 33.4546,
+        "lng": -88.7894
+      }
     ]
   },
   {
@@ -39,9 +69,134 @@
     "timeZone": "America/Chicago",
     "ready": false,
     "buildings": [
-      { "id": "lyceum", "name": "The Lyceum", "lat": 34.3653, "lng": -89.5383 },
-      { "id": "jdwilliams", "name": "J.D. Williams Library", "lat": 34.3647, "lng": -89.5368 },
-      { "id": "union", "name": "Student Union", "lat": 34.3632, "lng": -89.5376 }
+      {
+        "id": "lyceum",
+        "name": "The Lyceum",
+        "lat": 34.3653,
+        "lng": -89.5383
+      },
+      {
+        "id": "jdwilliams",
+        "name": "J.D. Williams Library",
+        "lat": 34.3647,
+        "lng": -89.5368
+      },
+      {
+        "id": "union",
+        "name": "Student Union",
+        "lat": 34.3632,
+        "lng": -89.5376
+      }
     ]
+  },
+  {
+    "name": "Jackson State University",
+    "shortName": "JSU",
+    "city": "Jackson",
+    "state": "MS",
+    "lat": 32.2968,
+    "lng": -90.2078,
+    "timeZone": "America/Chicago",
+    "ready": false,
+    "buildings": []
+  },
+  {
+    "name": "Alcorn State University",
+    "shortName": "Alcorn",
+    "city": "Lorman",
+    "state": "MS",
+    "lat": 31.8743,
+    "lng": -91.1354,
+    "timeZone": "America/Chicago",
+    "ready": false,
+    "buildings": []
+  },
+  {
+    "name": "Delta State University",
+    "shortName": "Delta State",
+    "city": "Cleveland",
+    "state": "MS",
+    "lat": 33.7465,
+    "lng": -90.729,
+    "timeZone": "America/Chicago",
+    "ready": false,
+    "buildings": []
+  },
+  {
+    "name": "Mississippi University for Women",
+    "shortName": "MUW",
+    "city": "Columbus",
+    "state": "MS",
+    "lat": 33.4978,
+    "lng": -88.4266,
+    "timeZone": "America/Chicago",
+    "ready": false,
+    "buildings": []
+  },
+  {
+    "name": "Mississippi Valley State University",
+    "shortName": "MVSU",
+    "city": "Itta Bena",
+    "state": "MS",
+    "lat": 33.4964,
+    "lng": -90.3209,
+    "timeZone": "America/Chicago",
+    "ready": false,
+    "buildings": []
+  },
+  {
+    "name": "William Carey University",
+    "shortName": "William Carey",
+    "city": "Hattiesburg",
+    "state": "MS",
+    "lat": 31.3166,
+    "lng": -89.357,
+    "timeZone": "America/Chicago",
+    "ready": false,
+    "buildings": []
+  },
+  {
+    "name": "Mississippi College",
+    "shortName": "MC",
+    "city": "Clinton",
+    "state": "MS",
+    "lat": 32.3402,
+    "lng": -90.3227,
+    "timeZone": "America/Chicago",
+    "ready": false,
+    "buildings": []
+  },
+  {
+    "name": "Belhaven University",
+    "shortName": "Belhaven",
+    "city": "Jackson",
+    "state": "MS",
+    "lat": 32.317,
+    "lng": -90.1779,
+    "timeZone": "America/Chicago",
+    "ready": false,
+    "buildings": []
+  },
+  {
+    "name": "Millsaps College",
+    "shortName": "Millsaps",
+    "city": "Jackson",
+    "state": "MS",
+    "lat": 32.3204,
+    "lng": -90.18,
+    "timeZone": "America/Chicago",
+    "ready": false,
+    "buildings": []
+  },
+  {
+    "name": "Tougaloo College",
+    "shortName": "Tougaloo",
+    "city": "Tougaloo",
+    "state": "MS",
+    "lat": 32.404,
+    "lng": -90.158,
+    "timeZone": "America/Chicago",
+    "ready": false,
+    "buildings": []
   }
 ]

@@ -13,22 +13,16 @@ export type Keyframe = CameraPose & { at: number };
 
 /** Landing keyframes (BUILD_PROMPT §7.2). Close-up zooms are ~0.7× the spec's values to suit our base fit. */
 export const LANDING_KEYFRAMES: Keyframe[] = [
-  // Hero: wide establishing shot. Campus and its dome behind, the closed apartment building,
-  // the leasing office, and the five bots out on the block.
+  // Out on the block: campus and its dome behind, the closed building, the leasing office.
   { at: 0.0, target: [-2, 5.5, -7], azimuth: 35, elevation: 22, zoom: 0.56 },
-  { at: 0.12, target: [2, 2, 0], azimuth: 37, elevation: 26, zoom: 0.72 },
-  // Team: down the block where the bots are working.
-  { at: 0.22, target: [11, 0.8, 10], azimuth: 35, elevation: 30, zoom: 1.15 },
-  // Ask: Concierge waits at the leasing office door.
-  { at: 0.38, target: [15.5, 1.2, 8.5], azimuth: 30, elevation: 26, zoom: 1.9 },
-  // To work: watch them walk in while the roof lifts off.
-  { at: 0.5, target: [5, 1.5, 6], azimuth: 40, elevation: 34, zoom: 0.95 },
-  { at: 0.64, target: [-6.5, 0.9, -3.5], azimuth: 45, elevation: 42, zoom: 1.6 },
-  { at: 0.7, target: [-1, 0.9, 1], azimuth: 45, elevation: 42, zoom: 1.6 },
-  { at: 0.76, target: [6, 0.9, -3.8], azimuth: 45, elevation: 42, zoom: 1.6 },
-  { at: 0.82, target: [6, 0.9, 2.5], azimuth: 45, elevation: 40, zoom: 1.5 },
-  { at: 0.9, target: [-1, 0.9, -5], azimuth: 45, elevation: 40, zoom: 1.5 },
-  { at: 1.0, target: [4, 0.9, 3], azimuth: 45, elevation: 46, zoom: 1.0 },
+  { at: 0.16, target: [-1, 5, -6], azimuth: 36, elevation: 23, zoom: 0.58 },
+  // Walking in while the roof lifts off.
+  { at: 0.36, target: [3, 1.5, 4], azimuth: 40, elevation: 32, zoom: 0.92 },
+  // Everyone at work inside.
+  { at: 0.52, target: [2.5, 0.6, 0.5], azimuth: 44, elevation: 40, zoom: 0.95 },
+  { at: 0.82, target: [2, 0.6, 0], azimuth: 46, elevation: 40, zoom: 1.0 },
+  // Goodbye wave.
+  { at: 1.0, target: [1.5, 0.8, 0], azimuth: 45, elevation: 37, zoom: 1.1 },
 ];
 
 export type FocusTarget = 'all' | 'leasing' | 'office' | 'kitchen' | 'living' | 'bedroom' | 'hall';
