@@ -3,7 +3,7 @@
     "lines": [
       {
         "speaker": "caller",
-        "text": "Hi, I'm an AI assistant calling on behalf of a student, Asha, who's moving to the University of Southern Mississippi. This call is recorded. Do you have a minute?"
+        "text": "Hi, I'm an AI assistant calling on behalf of a student, Sushil, who's moving to the University of Southern Mississippi. This is a student project that is being tested and developed. This call is being recorded and will be used by the student for research. Do you have a minute?"
       },
       { "speaker": "office", "text": "Sure. How can I help?" },
       { "speaker": "caller", "text": "Is your 1 bed available for move-in on August 14?" },
@@ -12,12 +12,12 @@
       { "speaker": "office", "text": "$650 a month, $300 deposit, and a $50 admin fee." },
       {
         "speaker": "caller",
-        "text": "She's an international student without an SSN. What do you accept instead, for example an I-20, funding letter, or a guarantor?"
+        "text": "He's an international student without an SSN. What do you accept instead, for example an I-20, funding letter, or a guarantor?"
       },
       { "speaker": "office", "text": "An I-20 and a funding letter work for us. No guarantor needed." },
       { "speaker": "caller", "text": "Any current specials?" },
       { "speaker": "office", "text": "Not right now, but we can talk about the admin fee." },
-      { "speaker": "caller", "text": "Can we send you her renter packet? What email should we use?" },
+      { "speaker": "caller", "text": "Can we send you his renter packet? What email should we use?" },
       { "speaker": "office", "text": "Send it to leasing@oakhollow.example." },
       { "speaker": "caller", "text": "Thank you so much. We'll follow up by email." }
     ],

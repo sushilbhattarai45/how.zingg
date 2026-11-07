@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { guardedVoice, type VoiceService } from '@/lib/services/voice';
 import { isAllowed, normalizePhone, NotAllowlistedError } from '@/lib/services/voice/allowlist';
-import { callOpening, startsWithDisclosure, AI_DISCLOSURE } from '@/lib/rules';
+import {
+  callOpening,
+  callerSystemPrompt,
+  dialOpening,
+  recallOpening,
+  startsWithDisclosure,
+  summarizePriorCall,
+  AI_DISCLOSURE,
+} from '@/lib/rules';
 import { scamCheck, shouldHide } from '@/lib/scam';
 
 describe('call allowlist', () => {
@@ -23,33 +31,73 @@ describe('call allowlist', () => {
         dialed++;
         return { externalId: 'x', mode: 'real' };
       },
+      async getCall() {
+        return { status: 'ended', messages: [] };
+      },
+      async endCall() {},
     };
     const voice = guardedVoice(inner, '+16019132221');
-    const vars = {
-      student_first_name: 'Asha',
-      university: 'USM',
-      unit: '1 bed',
-      move_in_date: 'Aug 14',
-      budget: '$800',
-      documents: 'I-20',
-      user_question: '',
-      callback_email: 'a@b.c',
+    const base = {
+      firstMessage: 'Hi',
+      systemPrompt: 'test',
+      callId: 'c1',
     };
-    await expect(
-      voice.placeCall({ to: '+16015550142', variables: vars, callId: 'c1' }),
-    ).rejects.toBeInstanceOf(NotAllowlistedError);
+    await expect(voice.placeCall({ to: '+16015550142', ...base })).rejects.toBeInstanceOf(
+      NotAllowlistedError,
+    );
     expect(dialed).toBe(0);
-    await voice.placeCall({ to: '+16019132221', variables: vars, callId: 'c2' });
+    await voice.placeCall({ to: '+16019132221', ...base, callId: 'c2' });
     expect(dialed).toBe(1);
   });
 });
 
 describe('AI disclosure', () => {
   it('is the first sentence of every call opening', () => {
-    const line = callOpening('Asha', 'the University of Southern Mississippi');
+    const line = callOpening('Sushil', 'the University of Southern Mississippi');
     expect(line.startsWith(AI_DISCLOSURE.slice(0, -1))).toBe(true);
     expect(startsWithDisclosure(line)).toBe(true);
-    expect(line).toContain('This call is recorded.');
+    expect(line).toContain('Sushil');
+    expect(line).toContain('This is a student project that is being tested and developed.');
+    expect(line).toContain('This call is being recorded and will be used by the student for research.');
+  });
+  it('leads the dial-pad opening with Sushil, project notice, and recording notice', () => {
+    const line = dialOpening();
+    expect(startsWithDisclosure(line)).toBe(true);
+    expect(line).toContain('Sushil');
+    expect(line).toContain('This is a student project that is being tested and developed.');
+    expect(line).toContain('This call is being recorded and will be used by the student for research.');
+    expect(line).toContain("He's looking for housing near campus");
+  });
+  it('teaches Caller to acknowledge call-back requests', () => {
+    expect(callerSystemPrompt(['What is rent?'])).toMatch(/call back later/i);
+  });
+  it('uses a distinct recall opening that still counts as disclosure', () => {
+    const first = dialOpening();
+    const recall = recallOpening();
+    expect(recall).not.toBe(first);
+    expect(recall).toMatch(/calling back|recall/i);
+    expect(recall).toContain('This call is being recorded');
+    expect(startsWithDisclosure(recall)).toBe(true);
+  });
+  it('injects prior-call memory on recall prompts and requires end-call', () => {
+    const memory = summarizePriorCall({
+      placeTitle: 'Oak Hollow',
+      transcript: [
+        { speaker: 'caller', text: 'What is rent?' },
+        { speaker: 'office', text: 'Six fifty a month.' },
+      ],
+      answers: { rent: 650 },
+    });
+    expect(memory).toMatch(/Oak Hollow/);
+    expect(memory).toMatch(/650/);
+    const prompt = callerSystemPrompt(['Any specials?'], {
+      isRecall: true,
+      memory,
+      placeTitle: 'Oak Hollow',
+    });
+    expect(prompt).toMatch(/RECALL/i);
+    expect(prompt).toMatch(/PRIOR CALL MEMORY/);
+    expect(prompt).toMatch(/end-call/i);
   });
 });
 

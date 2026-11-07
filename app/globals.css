@@ -154,6 +154,23 @@ dialog.sheet[open] {
   }
 }
 
+/* Call-in-progress waveform bars */
+@keyframes call-wave {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+.call-wave-bar {
+  height: 100%;
+  animation: call-wave 1s ease-in-out infinite;
+}
+
 /* Lights on: four window squares light up one by one, 80 ms apart */
 .lights-on > * {
   animation: light-on 250ms var(--ease-enter) both;

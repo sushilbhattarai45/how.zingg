@@ -191,7 +191,7 @@ export default defineSchema({
 
   calls: defineTable({
     userId: v.id('users'),
-    officeId: v.id('offices'),
+    officeId: v.optional(v.id('offices')),
     listingId: v.optional(v.id('listings')),
     taskId: v.optional(v.id('tasks')),
     toNumber: v.optional(v.string()),
@@ -228,13 +228,37 @@ export default defineSchema({
     ),
     externalId: v.optional(v.string()),
     recordingUrl: v.optional(v.string()),
+    /** Durable copy of the Vapi recording in Convex file storage (browser can play this). */
+    recordingStorageId: v.optional(v.id('_storage')),
+    recordingStatus: v.optional(
+      v.union(v.literal('pending'), v.literal('ready'), v.literal('unavailable')),
+    ),
+    listenUrl: v.optional(v.string()),
+    controlUrl: v.optional(v.string()),
+    questions: v.optional(v.array(v.string())),
+    mode: v.optional(v.union(v.literal('mock'), v.literal('vapi'))),
+    isExample: v.optional(v.boolean()),
+    error: v.optional(v.string()),
     disclosureSaid: v.boolean(),
+    /** Who requested the dial: user UI, receiver callback, or immediate Call button. */
+    scheduleSource: v.optional(
+      v.union(v.literal('user'), v.literal('receiver'), v.literal('immediate')),
+    ),
+    scheduleReason: v.optional(v.string()),
+    interestId: v.optional(v.id('placeInterests')),
+    canceledAt: v.optional(v.number()),
+    /** Prevent double auto-callback from the same ended call. */
+    callbackScheduled: v.optional(v.boolean()),
+    /** True after one guardrail bump so we only reschedule a blocked job once. */
+    guardrailRescheduled: v.optional(v.boolean()),
   })
     .index('by_user', ['userId'])
     .index('by_office', ['officeId'])
     .index('by_listing', ['listingId'])
     .index('by_status', ['status'])
-    .index('by_externalId', ['externalId']),
+    .index('by_externalId', ['externalId'])
+    .index('by_toNumber', ['toNumber'])
+    .index('by_status_scheduledFor', ['status', 'scheduledFor']),
 
   emails: defineTable({
     userId: v.id('users'),
@@ -335,4 +359,20 @@ export default defineSchema({
     message: v.optional(v.string()),
     createdAt: v.number(),
   }),
+
+  /** Places the student right-swiped (hardcoded realty demo). */
+  placeInterests: defineTable({
+    userId: v.id('users'),
+    placeSlug: v.string(),
+    placeTitle: v.string(),
+    addressQuery: v.string(),
+    unitType: v.string(),
+    rent: v.number(),
+    callId: v.optional(v.id('calls')),
+    /** Pending scheduled call (if any). */
+    scheduledCallId: v.optional(v.id('calls')),
+    createdAt: v.number(),
+  })
+    .index('by_user', ['userId'])
+    .index('by_slug', ['placeSlug']),
 });

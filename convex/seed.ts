@@ -101,8 +101,8 @@ async function seedAll(ctx: MutationCtx) {
   }
 
   const asha = await ctx.db.insert('users', {
-    name: 'Asha',
-    email: 'asha@example.com',
+    name: 'Sushil',
+    email: 'sushil@example.com',
     homeCountry: 'Nepal',
     timeZone: 'Asia/Kathmandu',
     universityId: usm,

@@ -9,8 +9,10 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as calls from "../calls.js";
 import type * as http from "../http.js";
 import type * as partners from "../partners.js";
+import type * as places from "../places.js";
 import type * as seed from "../seed.js";
 import type * as users from "../users.js";
 
@@ -22,8 +24,10 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  calls: typeof calls;
   http: typeof http;
   partners: typeof partners;
+  places: typeof places;
   seed: typeof seed;
   users: typeof users;
 }>;

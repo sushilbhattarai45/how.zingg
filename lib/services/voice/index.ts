@@ -15,11 +15,47 @@ export type CallVariables = {
   callback_email: string;
 };
 
+/** Params for placing an outbound phone call (Vapi or mock). */
+export type OutboundCallParams = {
+  to: string;
+  callId: string;
+  firstMessage: string;
+  systemPrompt: string;
+  maxDurationSeconds?: number;
+};
+
+export type OutboundCallResult = {
+  externalId: string;
+  mode: 'real' | 'mock';
+  listenUrl?: string;
+  controlUrl?: string;
+};
+
+export type RemoteCallMessage = {
+  role?: string;
+  message?: string;
+  content?: string;
+  time?: number;
+  secondsFromStart?: number;
+};
+
+export type RemoteCallSnapshot = {
+  status: string;
+  messages: RemoteCallMessage[];
+  recordingUrl?: string;
+  structuredData?: Record<string, unknown>;
+  listenUrl?: string;
+  controlUrl?: string;
+};
+
+/** @deprecated Prefer OutboundCallParams — kept for older call sites / tests. */
 export type PlaceCallParams = { to: string; variables: CallVariables; callId: string };
-export type PlaceCallResult = { externalId: string; mode: 'real' | 'mock' };
+export type PlaceCallResult = OutboundCallResult;
 
 export interface VoiceService {
-  placeCall(params: PlaceCallParams): Promise<PlaceCallResult>;
+  placeCall(params: OutboundCallParams): Promise<OutboundCallResult>;
+  getCall(externalId: string): Promise<RemoteCallSnapshot>;
+  endCall(controlUrl: string): Promise<void>;
 }
 
 /**
@@ -32,6 +68,8 @@ export function guardedVoice(inner: VoiceService, allowlist = envOrNull('CALL_AL
       if (!isAllowed(params.to, allowlist)) throw new NotAllowlistedError(params.to);
       return inner.placeCall(params);
     },
+    getCall: (id) => inner.getCall(id),
+    endCall: (url) => inner.endCall(url),
   };
 }
 
@@ -46,3 +84,5 @@ export function canCall(office: { phone?: string; callAllowed: boolean }): boole
   if (isDemoMode()) return true;
   return isAllowed(office.phone, envOrNull('CALL_ALLOWLIST'));
 }
+
+export { createVapiVoice, buildCallerAssistant } from './vapi';

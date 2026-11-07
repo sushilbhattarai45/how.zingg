@@ -5,13 +5,14 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Mic, Search, Shrink, Sparkles } from 'lucide-react';
+import { Heart, Mic, Phone, Search, Shrink, Sparkles } from 'lucide-react';
 import { WorldProvider } from '@/components/world/WorldContext';
 import type { WorldHandle } from '@/components/world/World';
 import type { FocusTarget } from '@/components/world/cameraRig';
 import type { BotId } from '@/components/world/store';
 import { UniversityPicker } from '@/components/ui/UniversityPicker';
 import { SearchSheet } from '@/components/search/SearchSheet';
+import { StartCallSheet } from '@/components/calls/StartCallSheet';
 import { AgentDot } from '@/components/ui/AgentDot';
 import { buttonClass } from '@/components/ui/Button';
 import { AGENTS } from '@/content/agents';
@@ -43,6 +44,7 @@ export function AppHome() {
   const world = useRef<WorldHandle | null>(null);
   const [focus, setFocus] = useState<FocusTarget>('all');
   const [askOpen, setAskOpen] = useState(false);
+  const [callOpen, setCallOpen] = useState(false);
 
   const go = (target: FocusTarget) => {
     setFocus(target);
@@ -72,7 +74,7 @@ export function AppHome() {
           <div className="max-w-xs flex-1">
             <UniversityPicker compact />
           </div>
-          <UserMenu />
+          <UserMenu onCallNumber={() => setCallOpen(true)} />
         </header>
 
         <AnimatePresence>
@@ -98,7 +100,7 @@ export function AppHome() {
               aria-label="Your team"
             >
               {AGENTS.map((a) => (
-                <li key={a.id}>
+                <li key={a.id} className="relative">
                   <button
                     onClick={() => {
                       go(ROOM_OF[a.id]);
@@ -117,6 +119,19 @@ export function AppHome() {
                     <span className="text-[12px] leading-4 font-bold">{a.name}</span>
                     <span className="text-[11px] leading-3 text-text-3">{STATUS[a.id]}</span>
                   </button>
+                  {a.id === 'caller' && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCallOpen(true);
+                      }}
+                      aria-label="Call a number with Caller"
+                      className="absolute -top-1 -right-1 grid size-8 place-items-center rounded-full bg-caller text-ink shadow-[var(--shadow-float)] hover:brightness-110"
+                    >
+                      <Phone size={14} strokeWidth={2.5} aria-hidden />
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -127,6 +142,12 @@ export function AppHome() {
                 className={buttonClass('primary', 'min-h-[52px] rounded-[16px] sm:w-auto sm:px-6')}
               >
                 <Sparkles size={18} aria-hidden /> Find my place
+              </Link>
+              <Link
+                href="/app/places"
+                className={buttonClass('secondary', 'min-h-[52px] rounded-[16px] sm:w-auto sm:px-6')}
+              >
+                <Heart size={18} aria-hidden /> My places
               </Link>
               <button
                 onClick={() => setAskOpen(true)}
@@ -143,6 +164,7 @@ export function AppHome() {
         </div>
 
         <SearchSheet open={askOpen} onClose={() => setAskOpen(false)} />
+        <StartCallSheet open={callOpen} onClose={() => setCallOpen(false)} />
       </div>
     </WorldProvider>
   );

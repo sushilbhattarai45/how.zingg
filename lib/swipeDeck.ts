@@ -1,81 +1,77 @@
 /**
- * The swipe deck: seeded example listings (scams never shown) and what the rest of the team does
- * the moment you say yes. Pure, so it's testable. Everything here is labeled "Example" in the UI.
+ * Swipe deck: hardcoded realty near USM (example data + local images). No scraping.
+ * Scout "searches" from an address the student types; results are always this seeded set for now.
  */
-import listingsSeed from '@/seed/listings.json';
+import realty from '@/seed/realtyPlaces.json';
 import { formatDual, zonedToUtc } from '@/lib/time';
 
 export type SwipeCard = {
   slug: string;
   title: string;
+  address: string;
   unitType: string;
   rent: number;
   deposit?: number;
   walkMin?: number;
   noSSN: string;
   officeName: string;
-  officeKey: string;
   availableFrom: string;
   sourceUrl: string;
-  /** What Scout says when presenting it. */
   pitch: string;
-  /** 0..1 hue seed for the illustration. */
+  image: string;
   hue: number;
 };
 
 export type TeamTask = {
   agent: 'caller' | 'packet' | 'closer';
   text: string;
-  /** Something the student can do now (e.g. add a document). */
   action?: string;
 };
 
 const OFFICE_TZ = 'America/Chicago';
 
-type Listing = (typeof listingsSeed.listings)[number];
-
-function pitchFor(l: Listing, walk?: number): string {
-  if (l.noSSN === 'ok') return 'They take an I-20 instead of an SSN!';
-  if (walk && walk <= 10) return `Only ${walk} min walk to class!`;
-  if (l.rent < 600) return `Just $${l.rent} a month!`;
-  return 'Close to campus, and in your budget.';
+/** Build the deck for an address query. Hardcoded places for now (no live scrape). */
+export function buildDeck(addressQuery = ''): SwipeCard[] {
+  const q = addressQuery.trim().toLowerCase();
+  // Light filter: if they typed a street name that matches a place, prefer those first.
+  const scored = realty.places.map((p, i) => {
+    const hay = `${p.title} ${p.address}`.toLowerCase();
+    const hit = q && hay.includes(q.split(',')[0]!.trim()) ? 0 : 1;
+    return { p, i, hit };
+  });
+  scored.sort((a, b) => a.hit - b.hit || (a.p.walkMin ?? 99) - (b.p.walkMin ?? 99));
+  return scored.map(({ p, i }) => ({
+    slug: p.slug,
+    title: p.title,
+    address: p.address,
+    unitType: p.unitType,
+    rent: p.rent,
+    deposit: p.deposit,
+    walkMin: p.walkMin,
+    noSSN: p.noSSN,
+    officeName: p.officeName,
+    availableFrom: p.availableFrom,
+    sourceUrl: p.sourceUrl,
+    pitch: p.pitch,
+    image: p.image,
+    hue: (i * 0.17) % 1,
+  }));
 }
 
-export function buildDeck(): SwipeCard[] {
-  const offices = new Map(listingsSeed.offices.map((o) => [o.key, o]));
-  return listingsSeed.listings
-    .filter((l) => l.scamFlags.length === 0)
-    .map((l, i) => {
-      const walk = (l.commute as Record<string, { walkMin?: number }>).scianna?.walkMin;
-      const office = offices.get(l.office);
-      return {
-        slug: l.slug,
-        title: l.title,
-        unitType: l.unitType,
-        rent: l.rent,
-        deposit: l.deposit,
-        walkMin: walk,
-        noSSN: l.noSSNNote ?? 'No-SSN policy: Caller will ask',
-        officeName: office?.name ?? `${l.title} Leasing`,
-        officeKey: l.office,
-        availableFrom: l.availableFrom,
-        sourceUrl: l.sourceUrl,
-        pitch: pitchFor(l, walk),
-        hue: (i * 0.17) % 1,
-      };
-    })
-    .sort((a, b) => (a.walkMin ?? 99) - (b.walkMin ?? 99));
+export function campusLabel(): string {
+  return realty.campusLabel;
 }
 
-/** How many listings Scout hid as scams (shown as a note, never as cards). */
+/** Look up a seeded place by slug (for My Places cards). */
+export function placeBySlug(slug: string) {
+  return realty.places.find((p) => p.slug === slug) ?? null;
+}
+
+/** Legacy helper used by tests — scams are not in the realty seed. */
 export function hiddenScams(): number {
-  return listingsSeed.listings.filter((l) => l.scamFlags.length > 0).length;
+  return 0;
 }
 
-/**
- * What the team starts on right away when you say yes. Caller asks the office (never guesses live
- * info), Packet asks for what's missing, Closer looks for a better deal.
- */
 export function tasksFor(card: SwipeCard, userTz: string, today = new Date()): TeamTask[] {
   const d = new Date(today);
   d.setDate(d.getDate() + 1);
@@ -83,7 +79,7 @@ export function tasksFor(card: SwipeCard, userTz: string, today = new Date()): T
   return [
     {
       agent: 'caller',
-      text: `Calling ${card.officeName} at ${formatDual(nineAm, OFFICE_TZ, userTz)} to ask if the ${card.unitType} is free from your move-in date.`,
+      text: `Ready to call about ${card.title} (${card.unitType}) from My Places — dials your DEMO_CALL_TO only. ${formatDual(nineAm, OFFICE_TZ, userTz)}.`,
     },
     {
       agent: 'packet',

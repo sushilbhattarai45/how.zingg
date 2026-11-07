@@ -1,13 +1,12 @@
 'use client';
 
 /**
- * "Find your place": Scout searches, then presents places one at a time. Swipe (or tap) yes or no.
- * Scout reacts: excited on a yes, embarrassed on a no. Every yes goes straight to the team:
- * Caller schedules a call, Packet asks for what's missing, Closer hunts for a deal.
- * UI demo on seeded example data (labeled "Example").
+ * Address → Scout "searches" hardcoded USM realty (with photos) → Tinder-style swipe.
+ * Right-swipe saves to My Places. Calling happens there and dials DEMO_CALL_TO only.
  */
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AnimatePresence,
   animate,
@@ -17,49 +16,68 @@ import {
   useTransform,
   type PanInfo,
 } from 'motion/react';
-import { ArrowLeft, Check, ExternalLink, Footprints, IdCard, Upload, X } from 'lucide-react';
+import { useAction } from 'convex/react';
+import { ArrowLeft, Check, ExternalLink, Footprints, Heart, IdCard, MapPin, Upload, X } from 'lucide-react';
 import { BotAvatar, type BotMood } from '@/components/ui/BotAvatar';
-import { Button } from '@/components/ui/Button';
+import { Button, ButtonLink } from '@/components/ui/Button';
 import { AgentDot } from '@/components/ui/AgentDot';
 import { AGENTS, AGENT_COLOR } from '@/content/agents';
-import { buildDeck, hiddenScams, tasksFor, type SwipeCard, type TeamTask } from '@/lib/swipeDeck';
+import { api } from '@/convex/_generated/api';
+import {
+  buildDeck,
+  campusLabel,
+  hiddenScams,
+  tasksFor,
+  type SwipeCard,
+  type TeamTask,
+} from '@/lib/swipeDeck';
 
 const EASE = [0.2, 0.8, 0.2, 1] as const;
-const SEARCH_STEPS = [
-  'Reading listings near USM…',
-  'Hiding a scam that wants a wire…',
-  'Ranking by walk time to class…',
-];
 const NOPE_LINES = [
   "Oops… not your style? The next one's better, promise!",
   'Hehe, my bad. Let me show you another.',
   "Noted! I'll skip places like that.",
 ];
 const YES_LINES = [
-  'Yes! Great pick! Team, let’s go!',
-  'Ooh, I love that one too! On it!',
-  'Wishlisted! Handing it to the team!',
+  'Yes! Saved to My Places — call whenever you’re ready.',
+  'Ooh, great pick! It’s on your wishlist now.',
+  'Wishlisted! Open My Places when you want Caller to ring you.',
 ];
 
-type Phase = 'searching' | 'presenting' | 'reacting' | 'done';
+type Phase = 'address' | 'searching' | 'presenting' | 'reacting' | 'done';
 type Pick = { card: SwipeCard; tasks: TeamTask[] };
 
 export function SwipeDeck() {
-  const deck = useMemo(() => buildDeck(), []);
   const reduced = useReducedMotion() ?? false;
-  const [phase, setPhase] = useState<Phase>('searching');
+  const savePlace = useAction(api.places.savePlace);
+  const [address, setAddress] = useState('');
+  const [addressQuery, setAddressQuery] = useState('');
+  const [deck, setDeck] = useState<SwipeCard[]>([]);
+  const [phase, setPhase] = useState<Phase>('address');
   const [step, setStep] = useState(0);
   const [index, setIndex] = useState(0);
-  const [mood, setMood] = useState<BotMood>('searching');
-  const [line, setLine] = useState(SEARCH_STEPS[0]!);
+  const [mood, setMood] = useState<BotMood>('idle');
+  const [line, setLine] = useState('Where should I look? Drop a campus or street near you.');
   const [picks, setPicks] = useState<Pick[]>([]);
   const [toss, setToss] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [callError, setCallError] = useState<string | null>(null);
   const timers = useRef<number[]>([]);
-  const later = (fn: () => void, ms: number) => timers.current.push(window.setTimeout(fn, reduced ? 0 : ms));
+  const later = (fn: () => void, ms: number) =>
+    timers.current.push(window.setTimeout(fn, reduced ? 0 : ms));
+
+  const searchSteps = useCallback(
+    (q: string) => [
+      `Reading places near “${q || campusLabel()}”…`,
+      'Checking rent, walk times, and no-SSN notes…',
+      'Ranking the best matches for you…',
+    ],
+    [],
+  );
 
   const present = useCallback(
-    (i: number) => {
-      const card = deck[i];
+    (i: number, cards: SwipeCard[]) => {
+      const card = cards[i];
       if (!card) {
         setPhase('done');
         setMood('happy');
@@ -68,45 +86,78 @@ export function SwipeDeck() {
       }
       setPhase('presenting');
       setMood(i === 0 ? 'excited' : 'happy');
-      setLine(i === 0 ? `Found ${deck.length} places! First up: ${card.pitch}` : card.pitch);
+      setLine(i === 0 ? `Found ${cards.length} places! First up: ${card.pitch}` : card.pitch);
     },
-    [deck],
+    [],
   );
 
-  // Search, then present the first card.
-  useEffect(() => {
-    const ts = timers.current;
-    SEARCH_STEPS.forEach((s, i) =>
-      ts.push(
-        window.setTimeout(
-          () => {
-            setStep(i);
-            setLine(s);
-          },
-          reduced ? 0 : i * 1100,
-        ),
-      ),
+  const startSearch = (q: string) => {
+    const trimmed = q.trim();
+    if (!trimmed) {
+      setCallError('Enter an address or campus building first.');
+      return;
+    }
+    setCallError(null);
+    setAddressQuery(trimmed);
+    const cards = buildDeck(trimmed);
+    setDeck(cards);
+    setIndex(0);
+    setPicks([]);
+    setPhase('searching');
+    setMood('searching');
+    const steps = searchSteps(trimmed);
+    setLine(steps[0]!);
+    setStep(0);
+    timers.current.forEach(clearTimeout);
+    timers.current = [];
+    steps.forEach((s, i) =>
+      later(() => {
+        setStep(i);
+        setLine(s);
+      }, i * 1100),
     );
-    ts.push(window.setTimeout(() => present(0), reduced ? 0 : SEARCH_STEPS.length * 1100 + 300));
-    return () => ts.forEach(clearTimeout);
-  }, [present, reduced]);
+    later(() => present(0, cards), steps.length * 1100 + 300);
+  };
 
-  const decide = (yes: boolean) => {
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+
+  const decide = async (yes: boolean) => {
     const card = deck[index];
-    if (!card || phase !== 'presenting') return;
+    if (!card || phase !== 'presenting' || saving) return;
     setPhase('reacting');
     if (yes) {
       setMood('excited');
       setLine(YES_LINES[picks.length % YES_LINES.length]!);
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
       setToss((n) => n + 1);
-      later(() => setPicks((p) => [{ card, tasks: tasksFor(card, tz) }, ...p]), 450);
-    } else {
-      setMood('embarrassed');
-      setLine(NOPE_LINES[index % NOPE_LINES.length]!);
+      setSaving(true);
+      setCallError(null);
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      try {
+        await savePlace({
+          placeSlug: card.slug,
+          placeTitle: card.title,
+          unitType: card.unitType,
+          rent: card.rent,
+          addressQuery,
+        });
+        later(() => setPicks((p) => [{ card, tasks: tasksFor(card, tz) }, ...p]), 400);
+      } catch (err) {
+        const msg =
+          err instanceof Error
+            ? err.message.replace(/^\[CONVEX[^\]]*\]\s*/i, '').replace(/^Uncaught Error:\s*/i, '')
+            : 'Could not save the place';
+        setCallError(msg);
+      } finally {
+        setSaving(false);
+      }
+      setIndex((i) => i + 1);
+      later(() => present(index + 1, deck), 1900);
+      return;
     }
+    setMood('embarrassed');
+    setLine(NOPE_LINES[index % NOPE_LINES.length]!);
     setIndex((i) => i + 1);
-    later(() => present(index + 1), yes ? 1700 : 1900);
+    later(() => present(index + 1, deck), 1900);
   };
 
   const card = deck[index];
@@ -127,9 +178,13 @@ export function SwipeDeck() {
           <div className="flex-1">
             <h1 className="text-[22px] leading-7 font-extrabold">Find your place</h1>
             <p className="text-[13px] leading-[19px] text-text-3">
-              {phase === 'searching'
-                ? 'Scout is searching…'
-                : `${Math.min(index + 1, deck.length)} of ${deck.length} · near USM`}
+              {phase === 'address'
+                ? 'Enter an address — Scout will look nearby'
+                : phase === 'searching'
+                  ? 'Scout is searching…'
+                  : deck.length
+                    ? `${Math.min(index + 1, deck.length)} of ${deck.length} · ${campusLabel()}`
+                    : campusLabel()}
             </p>
           </div>
         </header>
@@ -164,65 +219,139 @@ export function SwipeDeck() {
           </div>
         </div>
 
-        {/* Deck */}
-        <div className="relative mt-5 h-[440px]">
-          <AnimatePresence>
-            {phase === 'searching' && <Searching key="searching" step={step} reduced={reduced} />}
-          </AnimatePresence>
-          {phase !== 'searching' && phase !== 'done' && (
-            <>
-              {next && <CardView key={`${next.slug}-under`} card={next} under />}
-              <AnimatePresence custom={0}>
-                {card && (
-                  <Draggable
-                    key={card.slug}
-                    card={card}
-                    disabled={phase !== 'presenting'}
-                    onDecide={decide}
-                    reduced={reduced}
-                  />
-                )}
-              </AnimatePresence>
-            </>
-          )}
-          {phase === 'done' && (
-            <div className="grid h-full place-items-center rounded-[20px] border border-dashed border-line p-6 text-center">
-              <div>
-                <p className="text-[18px] leading-6 font-extrabold">
-                  {picks.length ? `${picks.length} on your wishlist` : 'No picks this time'}
-                </p>
-                <p className="mt-1 text-text-2">
-                  {hiddenScams()} scam listing hidden. New places show up as Scout finds them.
-                </p>
-                <Link
-                  href="/app"
-                  className="mt-4 inline-block font-bold text-window underline underline-offset-2"
-                >
-                  Back to your team
-                </Link>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Yes / no */}
-        <div className="mt-5 flex gap-3">
-          <Button
-            variant="secondary"
-            className="flex-1"
-            disabled={phase !== 'presenting'}
-            onClick={() => decide(false)}
+        {phase === 'address' && (
+          <form
+            className="mt-5 flex flex-col gap-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              startSearch(address);
+            }}
           >
-            <X size={18} strokeWidth={2.5} aria-hidden /> Not for me
-          </Button>
-          <Button className="flex-1" disabled={phase !== 'presenting'} onClick={() => decide(true)}>
-            <Check size={18} strokeWidth={2.5} aria-hidden /> Yes, go for it
-          </Button>
-        </div>
-        <p className="mt-2 text-center text-[12px] leading-4 text-text-3">
-          Swipe right for yes, left for no, or use ← →
-        </p>
-        <KeyboardSwipe enabled={phase === 'presenting'} onDecide={decide} />
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[13px] font-bold">Campus or street address</span>
+              <span className="flex items-center gap-2 rounded-[16px] border border-line bg-surface px-3">
+                <MapPin size={18} className="text-scout" aria-hidden />
+                <input
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="e.g. Scianna Hall, Hattiesburg MS"
+                  className="h-12 min-w-0 flex-1 bg-transparent text-[15px] font-semibold outline-none placeholder:text-text-3"
+                  autoFocus
+                />
+              </span>
+            </label>
+            <Button type="submit" className="w-full">
+              Search with Scout
+            </Button>
+            <p className="text-[12px] leading-4 text-text-3">
+              Example places near {campusLabel()} (hardcoded photos — no live scrape yet). Right-swipe
+              saves to My Places; call from there rings <strong>your</strong> DEMO_CALL_TO only.
+            </p>
+            {callError && (
+              <p role="alert" className="text-[14px] font-semibold text-[#F25C8A]">
+                {callError}
+              </p>
+            )}
+          </form>
+        )}
+
+        {/* Deck */}
+        {phase !== 'address' && (
+          <div className="relative mt-5 h-[440px]">
+            <AnimatePresence>
+              {phase === 'searching' && (
+                <Searching key="searching" step={step} steps={3} reduced={reduced} />
+              )}
+            </AnimatePresence>
+            {phase !== 'searching' && phase !== 'done' && (
+              <>
+                {next && <CardView key={`${next.slug}-under`} card={next} under />}
+                <AnimatePresence custom={0}>
+                  {card && (
+                    <Draggable
+                      key={card.slug}
+                      card={card}
+                      disabled={phase !== 'presenting' || saving}
+                      onDecide={decide}
+                      reduced={reduced}
+                    />
+                  )}
+                </AnimatePresence>
+              </>
+            )}
+            {phase === 'done' && (
+              <div className="grid h-full place-items-center rounded-[20px] border border-dashed border-line p-6 text-center">
+                <div>
+                  <p className="text-[18px] leading-6 font-extrabold">
+                    {picks.length ? `${picks.length} on your wishlist` : 'No picks this time'}
+                  </p>
+                  <p className="mt-1 text-text-2">
+                    {hiddenScams()
+                      ? `${hiddenScams()} scam listing hidden. `
+                      : ''}
+                    Searched near “{addressQuery}”.
+                  </p>
+                  {picks.length > 0 && (
+                    <ButtonLink href="/app/places" className="mt-4 w-full">
+                      <Heart size={16} aria-hidden /> Go to My Places
+                    </ButtonLink>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhase('address');
+                      setMood('idle');
+                      setLine('Want to try another address?');
+                    }}
+                    className="mt-4 font-bold text-window underline underline-offset-2"
+                  >
+                    Search again
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {phase !== 'address' && phase !== 'done' && phase !== 'searching' && (
+          <>
+            <div className="mt-5 flex gap-3">
+              <Button
+                variant="secondary"
+                className="flex-1"
+                disabled={phase !== 'presenting' || saving}
+                onClick={() => void decide(false)}
+              >
+                <X size={18} strokeWidth={2.5} aria-hidden /> Not for me
+              </Button>
+              <Button
+                className="flex-1"
+                disabled={phase !== 'presenting' || saving}
+                onClick={() => void decide(true)}
+              >
+                <Check size={18} strokeWidth={2.5} aria-hidden />
+                {saving ? 'Saving…' : 'Yes, save'}
+              </Button>
+            </div>
+            <p className="mt-2 text-center text-[12px] leading-4 text-text-3">
+              Swipe right to save · left to pass · call from My Places
+            </p>
+            {picks.length > 0 && (
+              <ButtonLink href="/app/places" variant="secondary" className="mt-3 w-full">
+                <Heart size={16} aria-hidden /> My Places ({picks.length})
+              </ButtonLink>
+            )}
+            {callError && (
+              <p role="alert" className="mt-2 text-center text-[13px] font-semibold text-[#F25C8A]">
+                {callError}
+              </p>
+            )}
+            <KeyboardSwipe
+              enabled={phase === 'presenting' && !saving}
+              onDecide={(y) => void decide(y)}
+            />
+          </>
+        )}
       </section>
 
       {/* Right: the team gets to work on every yes */}
@@ -242,7 +371,15 @@ const PINS: [number, number][] = [
   [56, 44],
 ];
 
-function Searching({ step, reduced }: { step: number; reduced: boolean }) {
+function Searching({
+  step,
+  steps,
+  reduced,
+}: {
+  step: number;
+  steps: number;
+  reduced: boolean;
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.98 }}
@@ -291,7 +428,7 @@ function Searching({ step, reduced }: { step: number; reduced: boolean }) {
         </motion.span>
       ))}
       <div className="absolute inset-x-4 bottom-4 flex justify-center gap-1.5">
-        {SEARCH_STEPS.map((_, i) => (
+        {Array.from({ length: steps }, (_, i) => (
           <span
             key={i}
             className={`h-1.5 rounded-full transition-all duration-300 ${i <= step ? 'w-8 bg-scout' : 'w-4 bg-white/20'}`}
@@ -382,7 +519,19 @@ function CardView({ card, under }: { card: SwipeCard; under?: boolean }) {
       className={`absolute inset-0 flex flex-col overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-float)] ${under ? 'translate-y-3 scale-[0.95] opacity-60' : ''}`}
       aria-hidden={under}
     >
-      <Building hue={card.hue} />
+      <div className="relative h-[180px] w-full shrink-0 bg-raised">
+        <Image
+          src={card.image}
+          alt=""
+          fill
+          className="object-cover"
+          sizes="(max-width: 480px) 100vw, 480px"
+          priority={!under}
+        />
+        <span className="absolute top-3 right-3 rounded-full bg-ink/70 px-2 py-0.5 text-[12px] font-bold text-chalk">
+          Example
+        </span>
+      </div>
       <div className="flex flex-1 flex-col p-4">
         <div className="flex items-start justify-between gap-2">
           <div>
@@ -394,10 +543,11 @@ function CardView({ card, under }: { card: SwipeCard; under?: boolean }) {
                 day: 'numeric',
               })}
             </p>
+            <p className="mt-1 flex items-start gap-1 text-[12px] leading-4 text-text-3">
+              <MapPin size={12} className="mt-0.5 shrink-0" aria-hidden />
+              {card.address}
+            </p>
           </div>
-          <span className="rounded-full bg-raised px-2 py-0.5 text-[12px] leading-4 font-bold text-text-2">
-            Example
-          </span>
         </div>
         <p className="mt-3 text-[28px] leading-8 font-extrabold tabular">
           ${card.rent}
@@ -430,46 +580,6 @@ function CardView({ card, under }: { card: SwipeCard; under?: boolean }) {
   );
 }
 
-/** Original illustration: a small apartment building with lit windows (no stock photos). */
-function Building({ hue }: { hue: number }) {
-  const walls = ['#c9b79c', '#a8604a', '#8fa58a', '#d6a77a', '#8d9bb3', '#b97f6a'][Math.floor(hue * 6) % 6]!;
-  const lit = (i: number) => (i * 7 + Math.floor(hue * 10)) % 3 !== 0;
-  return (
-    <svg
-      viewBox="0 0 400 170"
-      className="h-[170px] w-full shrink-0"
-      aria-hidden
-      preserveAspectRatio="xMidYMid slice"
-    >
-      <rect width="400" height="170" fill="#2a2630" />
-      <circle cx="340" cy="34" r="14" fill="#f7f0de" opacity="0.8" />
-      <rect y="140" width="400" height="30" fill="#41603d" />
-      <circle cx="40" cy="120" r="26" fill="#4f8a46" />
-      <rect x="37" y="120" width="6" height="26" fill="#6b4a32" />
-      <circle cx="360" cy="124" r="22" fill="#62a055" />
-      <rect x="90" y="40" width="220" height="104" rx="8" fill={walls} />
-      <rect x="84" y="34" width="232" height="10" rx="4" fill="#4b4548" />
-      {Array.from({ length: 12 }, (_, i) => {
-        const c = i % 6;
-        const r = Math.floor(i / 6);
-        return (
-          <rect
-            key={i}
-            x={104 + c * 33}
-            y={54 + r * 36}
-            width="22"
-            height="22"
-            rx="4"
-            fill={lit(i) ? '#ffd9a0' : '#2b2a33'}
-          />
-        );
-      })}
-      <rect x="186" y="112" width="28" height="32" rx="5" fill="#4a6e66" />
-      <circle cx="208" cy="128" r="2" fill="#f2c230" />
-    </svg>
-  );
-}
-
 /* ───────────── Team panel ───────────── */
 
 function TeamPanel({ picks }: { picks: Pick[] }) {
@@ -495,7 +605,8 @@ function TeamPanel({ picks }: { picks: Pick[] }) {
 
         {picks.length === 0 ? (
           <p className="mt-3 text-text-2">
-            Say yes to a place and Caller, Packet and Closer start on it right away.
+            Right-swipe a place to save it. Then open My Places and tap Call — Caller rings your{' '}
+            DEMO_CALL_TO number, not the real office.
           </p>
         ) : (
           <ol className="mt-4 flex flex-col gap-4">
@@ -512,7 +623,7 @@ function TeamPanel({ picks }: { picks: Pick[] }) {
                   <p className="flex items-center justify-between gap-2 font-bold">
                     {card.title} · ${card.rent}
                     <span className="rounded-full bg-window-dim px-2 py-0.5 text-[12px] leading-4 font-bold text-good">
-                      Wishlist
+                      Saved
                     </span>
                   </p>
                   <ul className="mt-2 flex flex-col gap-2">
@@ -525,8 +636,13 @@ function TeamPanel({ picks }: { picks: Pick[] }) {
             </AnimatePresence>
           </ol>
         )}
+        {picks.length > 0 && (
+          <ButtonLink href="/app/places" className="mt-4 w-full">
+            <Heart size={16} aria-hidden /> Go to My Places
+          </ButtonLink>
+        )}
         <p className="mt-4 text-[12px] leading-4 text-text-3">
-          Example data. Nothing is sent or booked without your OK.
+          Example data + demo dial. Real estate phones are never called from this flow.
         </p>
       </div>
     </section>
