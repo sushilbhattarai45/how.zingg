@@ -12,7 +12,7 @@ import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useWorldStore } from './WorldContext';
 import { BOT_IDS, DRIVE_DEFAULTS, type BotDrive, type BotId } from './store';
-import { LEASING_GREET, OUTDOOR } from './layout';
+import { OUTDOOR } from './layout';
 import {
   LINES,
   POKE_SECONDS,
@@ -26,7 +26,7 @@ import {
   type ClipName,
   type NavNodeId,
 } from './navGraph';
-import { BEATS } from '@/content/beats';
+import { SHOW } from '@/content/beats';
 
 type P = [number, number];
 
@@ -89,78 +89,55 @@ function atStation(id: BotId, d: BotDrive, t: number) {
   set(d, { x, z, face: st.face, clip: st.clip, seat: st.seat ?? 'none', say: LINES[id].work });
 }
 
-const WALKERS: BotId[] = ['scout', 'caller', 'packet', 'closer'];
+/** Walk-in order: Concierge leads, the rest follow. */
+const WALK_ORDER: BotId[] = ['concierge', 'scout', 'caller', 'packet', 'closer'];
 const ROUTES = Object.fromEntries(BOT_IDS.map((id) => [id, landingRoute(id)])) as Record<
   BotId,
   ReturnType<typeof landingRoute>
 >;
-const TO_LEASING = polyline([OUTDOOR.concierge.at, [10, 10.4], LEASING_GREET]);
-const CONCIERGE_HOME = polyline([LEASING_GREET, ...routePoints('leasing_out', 'couch')]);
-/** Concierge strolls from the leasing office to the couch while the camera tours the rooms. */
-const CONCIERGE_WALK: [number, number] = [BEATS.rooms[0], BEATS.couch[0] - 0.01];
 
+/** Closer says goodbye for the team; the others just wave. */
+const GOODBYE = ['Goodbye! See you at move-in!'] as const;
+/** After the wave, everyone goes back to work (the resting end frame). */
+const BACK_TO_WORK = 0.995;
+
+/** The landing show: hang out → walk in (roof lifts) → work → wave goodbye. */
 export function LandingDirector() {
   const store = useWorldStore();
 
   useFrame(({ clock }) => {
     const p = store.get().scrollProgress;
     const t = clock.elapsedTime;
-    const [ws, we] = BEATS['to-work'];
-    const booked = p >= BEATS.booked[0];
+    const [ws, we] = SHOW.walk;
 
     for (const id of BOT_IDS) {
       const d = store.drive[id];
-
-      if (id === 'concierge') {
-        const [as, ae] = BEATS.ask;
-        if (p < as) outdoors(id, d, t);
-        else if (p < CONCIERGE_WALK[0]) {
-          // Walks over to the leasing office and waits for you there.
-          const k = clamp01((p - as) / ((ae - as) * 0.4));
-          const at = along(TO_LEASING, k * TO_LEASING.length);
-          const there = k >= 1;
-          set(d, {
-            x: at.x,
-            z: at.z,
-            face: at.heading,
-            clip: there ? 'greet' : 'walk',
-            faceCamera: there,
-            say: there ? ['What can I help you find?', 'Tap the office to ask me.'] : null,
-          });
-        } else if (p < CONCIERGE_WALK[1]) {
-          const k = clamp01((p - CONCIERGE_WALK[0]) / (CONCIERGE_WALK[1] - CONCIERGE_WALK[0]));
-          const at = along(CONCIERGE_HOME, k * CONCIERGE_HOME.length);
-          set(d, { x: at.x, z: at.z, face: at.heading, clip: k >= 1 ? 'chat' : 'walk' });
-        } else if (booked) {
-          const [x, z] = NODES.couch;
-          set(d, { x, z, face: STATIONS.concierge.face, clip: 'celebrate', say: ['Booked! Welcome home.'] });
-        } else atStation(id, d, t);
-        continue;
-      }
-
       if (p < ws) outdoors(id, d, t);
       else if (p < we) {
-        // Walk in, one after another, scrubbed by scroll.
-        const j = WALKERS.indexOf(id);
+        // Walk in one after another, at a calm pace.
+        const j = WALK_ORDER.indexOf(id);
         const k = (p - ws) / (we - ws);
-        const local = clamp01((k - j * 0.08) / 0.62);
+        const local = clamp01((k - j * 0.07) / 0.68);
         if (local >= 1) atStation(id, d, t);
         else {
           const route = ROUTES[id];
           const at = along(route, local * route.length);
-          set(d, {
-            x: at.x,
-            z: at.z,
-            face: at.heading,
-            clip: id === 'closer' ? 'talk' : id === 'packet' ? 'carry' : 'walk',
-            say: id === 'closer' ? LINES.closer.out : null,
-          });
+          set(d, { x: at.x, z: at.z, face: at.heading, clip: id === 'packet' ? 'carry' : 'walk' });
         }
-      } else if (booked) {
+      } else if (p < SHOW.bye[0] || p >= BACK_TO_WORK) atStation(id, d, t);
+      else {
+        // Goodbye: everyone stands, turns to you and waves; Closer says bye first.
         const st = STATIONS[id];
         const [x, z] = NODES[st.node];
-        set(d, { x, z, face: st.face, clip: id === 'closer' ? 'key' : 'celebrate' });
-      } else atStation(id, d, t);
+        set(d, {
+          x,
+          z,
+          face: st.face,
+          clip: 'wave',
+          faceCamera: true,
+          say: id === 'closer' ? GOODBYE : null,
+        });
+      }
     }
   });
   return null;

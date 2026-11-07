@@ -23,8 +23,6 @@ export function SpeechDirector() {
     last: null as BotId | null,
     count: {} as Partial<Record<BotId, number>>,
     playing: null as Queued | null,
-    lastP: 0,
-    stillSince: 0,
   });
 
   useFrame(({ clock }) => {
@@ -33,18 +31,6 @@ export function SpeechDirector() {
     const s = st.current;
     const say = (id: BotId, line: string, dur: number) =>
       Object.assign(sp, { id, line, start: now, until: now + dur });
-
-    // ── While the landing story is scrolling, everyone stays quiet (and stays quiet a beat after).
-    const { mode, scrollProgress } = store.get();
-    if (mode === 'landing') {
-      if (Math.abs(scrollProgress - s.lastP) > 1e-4) s.stillSince = now;
-      s.lastP = scrollProgress;
-      if (now - s.stillSince < 1.2 && !s.playing && !store.speechQueue.length) {
-        if (sp.id && now < sp.until) sp.until = now;
-        s.next = Math.max(s.next, now + 0.6);
-        return;
-      }
-    }
 
     // ── Queued lines (clicked bots) first
     if (s.playing && now >= sp.until) s.playing = null;

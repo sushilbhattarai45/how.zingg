@@ -13,7 +13,7 @@ import { WALL_H } from './layout';
 import { facadeTextures } from './canvasTextures';
 import { smoothstep } from './cameraRig';
 import { useWorldStore } from './WorldContext';
-import { BEATS } from '@/content/beats';
+import { SHOW } from '@/content/beats';
 
 const SIDING = '#d8ccb6';
 const T = 0.2;
@@ -22,7 +22,7 @@ const DOOR = { x: -1, w: 2.4 };
 
 /** 0 = closed building, 1 = fully open cutaway, as a function of landing scroll progress. */
 export function revealAt(p: number) {
-  const [ws, we] = BEATS['to-work'];
+  const [ws, we] = SHOW.walk;
   const len = we - ws;
   return smoothstep((p - (ws + len * 0.4)) / (len * 0.45));
 }
