@@ -41,6 +41,8 @@ export type RemoteCallMessage = {
 
 export type RemoteCallSnapshot = {
   status: string;
+  /** Vapi endedReason when present (e.g. customer-did-not-answer, busy). */
+  endedReason?: string;
   messages: RemoteCallMessage[];
   recordingUrl?: string;
   structuredData?: Record<string, unknown>;

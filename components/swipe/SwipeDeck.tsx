@@ -32,6 +32,7 @@ import {
   type SwipeCard,
   type TeamTask,
 } from '@/lib/swipeDeck';
+import { getGuestKey } from '@/lib/guestKey';
 
 const EASE = [0.2, 0.8, 0.2, 1] as const;
 const NOPE_LINES = [
@@ -52,7 +53,17 @@ type Pick = { card: SwipeCard; tasks: TeamTask[] };
 const ADD = -1;
 const SKIP = 1;
 
-export function SwipeDeck({ onAdd, added = 0 }: { onAdd?: (card: SwipeCard) => void; added?: number }) {
+export function SwipeDeck({
+  onAdd,
+  added = 0,
+  addedSlugs = [],
+}: {
+  /** Fired after a place is saved (or save fails). Passes interestId when Convex save succeeded. */
+  onAdd?: (card: SwipeCard, interestId: string | null) => void;
+  added?: number;
+  /** Slugs already on My list — cannot add again. */
+  addedSlugs?: string[];
+}) {
   const reduced = useReducedMotion() ?? false;
   const savePlace = useAction(api.places.savePlace);
   const [address, setAddress] = useState('');
@@ -133,21 +144,39 @@ export function SwipeDeck({ onAdd, added = 0 }: { onAdd?: (card: SwipeCard) => v
     setPhase('reacting');
     setDir(yes ? ADD : SKIP);
     if (yes) {
+      if (addedSlugs.includes(card.slug) || picks.some((p) => p.card.slug === card.slug)) {
+        setMood('embarrassed');
+        setLine(`${card.title} is already on your list — pick another.`);
+        setCallError(null);
+        setIndex((i) => i + 1);
+        later(() => present(index + 1, deck), 1400);
+        return;
+      }
       setMood('excited');
       setLine(YES_LINES[(picks.length + added) % YES_LINES.length]!);
       setToss((n) => n + 1);
       setSaving(true);
       setCallError(null);
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      let interestId: string | null = null;
+      let alreadySaved = false;
       try {
-        await savePlace({
+        const saved = await savePlace({
           placeSlug: card.slug,
           placeTitle: card.title,
           unitType: card.unitType,
           rent: card.rent,
           addressQuery,
+          guestKey: getGuestKey(),
         });
-        later(() => setPicks((p) => [{ card, tasks: tasksFor(card, tz) }, ...p]), 400);
+        interestId = saved.interestId;
+        alreadySaved = saved.alreadySaved;
+        if (alreadySaved) {
+          setMood('embarrassed');
+          setLine(`${card.title} is already on your list.`);
+        } else {
+          later(() => setPicks((p) => [{ card, tasks: tasksFor(card, tz) }, ...p]), 400);
+        }
       } catch (err) {
         // Still show it in the workspace; the save can be retried from My Places.
         const msg =
@@ -157,10 +186,10 @@ export function SwipeDeck({ onAdd, added = 0 }: { onAdd?: (card: SwipeCard) => v
         setCallError(msg);
       } finally {
         setSaving(false);
-        later(() => onAdd?.(card), 300);
+        later(() => onAdd?.(card, interestId), 300);
       }
       setIndex((i) => i + 1);
-      later(() => present(index + 1, deck), 1900);
+      later(() => present(index + 1, deck), alreadySaved ? 1400 : 1900);
       return;
     }
     setMood('embarrassed');

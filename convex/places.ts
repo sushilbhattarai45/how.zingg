@@ -8,6 +8,7 @@ import {
   internalAction,
   internalMutation,
   internalQuery,
+  mutation,
   query,
 } from './_generated/server';
 import { api, internal } from './_generated/api';
@@ -31,12 +32,83 @@ function demoDialNumber(): string {
   );
 }
 
-function questionsFor(interest: { unitType: string; placeTitle: string }): string[] {
-  return [
+function questionsFor(
+  interest: { unitType: string; placeTitle: string },
+  extra: string[] = [],
+): string[] {
+  const base = [
     `What is the monthly rent for a ${interest.unitType} at ${interest.placeTitle}?`,
     `Are there any current move-in specials at ${interest.placeTitle}?`,
     `Do you accept applicants without a US Social Security number at ${interest.placeTitle}?`,
   ];
+  const extras = extra.map((q) => q.trim()).filter(Boolean);
+  // User-asked questions first so Caller leads with them.
+  const merged = [...extras];
+  for (const q of base) {
+    if (!merged.some((e) => e.toLowerCase() === q.toLowerCase())) merged.push(q);
+  }
+  return merged;
+}
+
+/** Prefer signed-in user; else the browser guestKey user — never the shared demo user. */
+export const findUserByGuestKey = internalQuery({
+  args: { guestKey: v.string() },
+  handler: async (ctx, { guestKey }) => {
+    if (!guestKey.trim()) return null;
+    return await ctx.db
+      .query('users')
+      .withIndex('by_guestKey', (q) => q.eq('guestKey', guestKey))
+      .first();
+  },
+});
+
+export const createGuestUser = internalMutation({
+  args: { guestKey: v.string() },
+  handler: async (ctx, { guestKey }) => {
+    const existing = await ctx.db
+      .query('users')
+      .withIndex('by_guestKey', (q) => q.eq('guestKey', guestKey))
+      .first();
+    if (existing) return existing._id;
+    return await ctx.db.insert('users', {
+      guestKey,
+      name: 'Guest',
+      isAnonymous: true,
+    });
+  },
+});
+
+async function resolveQueryUserId(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ctx: any,
+  guestKey?: string,
+): Promise<Id<'users'> | null> {
+  const authId = (await getAuthUserId(ctx)) as Id<'users'> | null;
+  if (authId) return authId;
+  if (guestKey?.trim()) {
+    const guest = await ctx.db
+      .query('users')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .withIndex('by_guestKey', (q: any) => q.eq('guestKey', guestKey))
+      .first();
+    return guest?._id ?? null;
+  }
+  return null;
+}
+
+async function resolveActionUserId(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ctx: any,
+  guestKey?: string,
+): Promise<Id<'users'>> {
+  const authId = (await getAuthUserId(ctx)) as Id<'users'> | null;
+  if (authId) return authId;
+  if (!guestKey?.trim()) {
+    throw new ConvexError('Sign in or refresh the page to continue.');
+  }
+  const existing = await ctx.runQuery(internal.places.findUserByGuestKey, { guestKey });
+  if (existing) return existing._id as Id<'users'>;
+  return (await ctx.runMutation(internal.places.createGuestUser, { guestKey })) as Id<'users'>;
 }
 
 export const saveInterest = internalMutation({
@@ -123,6 +195,7 @@ type LastCallSummary = {
   recordingUrl: string | null;
   hasPlayableRecording: boolean;
   recordingStatus?: 'pending' | 'ready' | 'unavailable';
+  error?: string;
 };
 
 type ScheduledSummary = {
@@ -132,18 +205,11 @@ type ScheduledSummary = {
   scheduleReason?: string;
 };
 
-/** Saved places for the signed-in (or demo) user — with last call + pending schedule. */
+/** Saved places for the signed-in (or this browser's guest) user — never the shared demo user. */
 export const listMine = query({
-  args: {},
-  handler: async (ctx) => {
-    let userId = await getAuthUserId(ctx);
-    if (!userId) {
-      const demo = await ctx.db
-        .query('users')
-        .withIndex('by_isDemo', (q) => q.eq('isDemo', true))
-        .first();
-      userId = demo?._id ?? null;
-    }
+  args: { guestKey: v.optional(v.string()) },
+  handler: async (ctx, { guestKey }) => {
+    const userId = await resolveQueryUserId(ctx, guestKey);
     if (!userId) return [];
 
     const interests = await ctx.db
@@ -173,6 +239,7 @@ export const listMine = query({
               recordingUrl: storedUrl ?? call.recordingUrl ?? null,
               hasPlayableRecording: Boolean(storedUrl),
               recordingStatus: call.recordingStatus,
+              error: call.error,
             };
           }
         }
@@ -220,9 +287,329 @@ export const listMine = query({
   },
 });
 
+export type CallHistoryItem = {
+  callId: Id<'calls'>;
+  placeSlug: string;
+  placeTitle: string;
+  interestId?: Id<'placeInterests'>;
+  status: string;
+  startedAt?: number;
+  endedAt?: number;
+  scheduledFor?: number;
+  scheduleSource?: 'user' | 'receiver' | 'immediate';
+  scheduleReason?: string;
+  transcript: { speaker: 'caller' | 'office'; text: string; at: number }[];
+  answers?: LastCallSummary['answers'];
+  mode?: 'mock' | 'vapi';
+  isExample?: boolean;
+  canceledAt?: number;
+  /** e.g. missed:no-answer — used by the workspace chatbot. */
+  error?: string;
+};
+
+/**
+ * Full call history for the workspace conversation, keyed by placeSlug.
+ * Multiple calls for the same place are returned newest-first (client sorts chronologically).
+ */
+export const listCallHistory = query({
+  args: { guestKey: v.optional(v.string()) },
+  handler: async (ctx, { guestKey }) => {
+    const userId = await resolveQueryUserId(ctx, guestKey);
+    if (!userId) return {} as Record<string, CallHistoryItem[]>;
+
+    const interests = await ctx.db
+      .query('placeInterests')
+      .withIndex('by_user', (q) => q.eq('userId', userId!))
+      .collect();
+    const interestIds = new Set(interests.map((i) => i._id));
+    const slugByInterest = new Map(interests.map((i) => [i._id, i.placeSlug] as const));
+    const titleByInterest = new Map(interests.map((i) => [i._id, i.placeTitle] as const));
+    const slugByCallId = new Map<string, string>();
+    const titleByCallId = new Map<string, string>();
+    for (const i of interests) {
+      if (i.callId) {
+        slugByCallId.set(i.callId, i.placeSlug);
+        titleByCallId.set(i.callId, i.placeTitle);
+      }
+      if (i.scheduledCallId) {
+        slugByCallId.set(i.scheduledCallId, i.placeSlug);
+        titleByCallId.set(i.scheduledCallId, i.placeTitle);
+      }
+    }
+
+    const byUserCalls = await ctx.db
+      .query('calls')
+      .withIndex('by_user', (q) => q.eq('userId', userId!))
+      .collect();
+
+    // Also pull calls linked on interests (covers older dials that were stored under the demo user).
+    const seen = new Set(byUserCalls.map((c) => c._id));
+    const linkedCalls = [];
+    for (const i of interests) {
+      for (const id of [i.callId, i.scheduledCallId]) {
+        if (!id || seen.has(id)) continue;
+        const call = await ctx.db.get(id);
+        if (!call) continue;
+        seen.add(call._id);
+        linkedCalls.push(call);
+      }
+    }
+    const calls = [...byUserCalls, ...linkedCalls];
+
+    const bySlug: Record<string, CallHistoryItem[]> = {};
+    for (const call of calls) {
+      // Skip canceled schedules that never dialed.
+      if (call.canceledAt && call.status === 'failed' && call.error === 'Canceled') continue;
+
+      let placeSlug: string | undefined;
+      let placeTitle: string | undefined;
+      if (call.interestId && interestIds.has(call.interestId)) {
+        placeSlug = slugByInterest.get(call.interestId);
+        placeTitle = titleByInterest.get(call.interestId);
+      }
+      if (!placeSlug) {
+        placeSlug = slugByCallId.get(call._id);
+        placeTitle = titleByCallId.get(call._id);
+      }
+      if (!placeSlug) continue;
+
+      const item: CallHistoryItem = {
+        callId: call._id,
+        placeSlug,
+        placeTitle: placeTitle ?? placeSlug,
+        interestId: call.interestId,
+        status: call.status,
+        startedAt: call.startedAt,
+        endedAt: call.endedAt,
+        scheduledFor: call.scheduledFor,
+        scheduleSource: call.scheduleSource,
+        scheduleReason: call.scheduleReason,
+        transcript: call.transcript,
+        answers: call.answers,
+        mode: call.mode,
+        isExample: call.isExample,
+        canceledAt: call.canceledAt,
+        error: call.error,
+      };
+      (bySlug[placeSlug] ??= []).push(item);
+    }
+
+    for (const slug of Object.keys(bySlug)) {
+      bySlug[slug]!.sort((a, b) => {
+        const at = (c: CallHistoryItem) => c.startedAt ?? c.scheduledFor ?? c.endedAt ?? 0;
+        return at(a) - at(b);
+      });
+    }
+    return bySlug;
+  },
+});
+
+/**
+ * Remove a place from My list (all interest rows for that slug). Cancels any pending schedule.
+ */
+export const removeFromList = action({
+  args: { placeSlug: v.string(), guestKey: v.optional(v.string()) },
+  handler: async (ctx, { placeSlug, guestKey }): Promise<{ removed: number }> => {
+    const userId = await resolveActionUserId(ctx, guestKey);
+
+    const interests = await ctx.runQuery(internal.places.listInterestsBySlug, {
+      userId,
+      placeSlug,
+    });
+    for (const row of interests) {
+      if (row.scheduledCallId) {
+        await ctx.runMutation(internal.places.markScheduleCanceled, {
+          callId: row.scheduledCallId,
+        });
+      }
+      await ctx.runMutation(internal.places.deleteInterest, { interestId: row._id });
+    }
+    await ctx.runMutation(internal.places.deleteThread, { userId, placeSlug });
+    return { removed: interests.length };
+  },
+});
+
+export const deleteThread = internalMutation({
+  args: { userId: v.id('users'), placeSlug: v.string() },
+  handler: async (ctx, { userId, placeSlug }) => {
+    const row = await ctx.db
+      .query('placeThreads')
+      .withIndex('by_user_slug', (q) => q.eq('userId', userId).eq('placeSlug', placeSlug))
+      .first();
+    if (row) await ctx.db.delete(row._id);
+  },
+});
+
+export const upsertThread = mutation({
+  args: {
+    guestKey: v.optional(v.string()),
+    placeSlug: v.string(),
+    messages: v.array(
+      v.object({
+        id: v.string(),
+        from: v.string(),
+        text: v.string(),
+        action: v.optional(v.string()),
+        at: v.number(),
+      }),
+    ),
+    step: v.number(),
+    status: v.string(),
+    pendingAsk: v.optional(
+      v.union(v.null(), v.object({ questions: v.array(v.string()) })),
+    ),
+  },
+  handler: async (ctx, args) => {
+    let userId = await resolveQueryUserId(ctx, args.guestKey);
+    if (!userId) {
+      if (!args.guestKey?.trim()) return null;
+      const existing = await ctx.db
+        .query('users')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .withIndex('by_guestKey', (q: any) => q.eq('guestKey', args.guestKey!))
+        .first();
+      userId =
+        existing?._id ??
+        (await ctx.db.insert('users', {
+          guestKey: args.guestKey,
+          name: 'Guest',
+          isAnonymous: true,
+        }));
+    }
+    return await writeThread(ctx, userId, args);
+  },
+});
+
+async function writeThread(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ctx: any,
+  userId: Id<'users'>,
+  args: {
+    placeSlug: string;
+    messages: { id: string; from: string; text: string; action?: string; at: number }[];
+    step: number;
+    status: string;
+    pendingAsk?: { questions: string[] } | null;
+  },
+) {
+  const existing = await ctx.db
+    .query('placeThreads')
+    .withIndex('by_user_slug', (q: any) => q.eq('userId', userId).eq('placeSlug', args.placeSlug))
+    .first();
+
+  // Merge with any longer server thread, then drop content-duplicates (same from+text).
+  {
+    const byId = new Map<string, (typeof args.messages)[number]>();
+    for (const m of existing?.messages ?? []) byId.set(m.id, m);
+    for (const m of args.messages) byId.set(m.id, m);
+    const byFp = new Map<string, (typeof args.messages)[number]>();
+    const sorted = [...byId.values()].sort((a, b) => a.at - b.at || a.id.localeCompare(b.id));
+    for (const m of sorted) {
+      const fp = `${m.from}::${m.text.replace(/\s+/g, ' ').trim().toLowerCase()}`;
+      const prev = byFp.get(fp);
+      if (!prev) byFp.set(fp, m);
+      else if (!prev.action && m.action) byFp.set(fp, { ...m, at: prev.at, id: prev.id });
+    }
+    args = {
+      ...args,
+      messages: [...byFp.values()].sort((a, b) => a.at - b.at || a.id.localeCompare(b.id)),
+    };
+  }
+  const messages = args.messages;
+
+  const payload = {
+    messages,
+    step: args.step,
+    status: args.status,
+    pendingAsk: args.pendingAsk === undefined ? existing?.pendingAsk : args.pendingAsk ?? undefined,
+    updatedAt: Date.now(),
+  };
+  if (existing) {
+    await ctx.db.patch(existing._id, payload);
+    return existing._id;
+  }
+  return await ctx.db.insert('placeThreads', {
+    userId,
+    placeSlug: args.placeSlug,
+    ...payload,
+  });
+}
+
+export const listThreads = query({
+  args: { guestKey: v.optional(v.string()) },
+  handler: async (ctx, { guestKey }) => {
+    const userId = await resolveQueryUserId(ctx, guestKey);
+    if (!userId) {
+      return {} as Record<
+        string,
+        {
+          messages: { id: string; from: string; text: string; action?: string; at: number }[];
+          step: number;
+          status: string;
+          pendingAsk?: { questions: string[] } | null;
+          updatedAt: number;
+        }
+      >;
+    }
+    const rows = await ctx.db
+      .query('placeThreads')
+      .withIndex('by_user_slug', (q) => q.eq('userId', userId))
+      .collect();
+    const out: Record<
+      string,
+      {
+        messages: { id: string; from: string; text: string; action?: string; at: number }[];
+        step: number;
+        status: string;
+        pendingAsk?: { questions: string[] } | null;
+        updatedAt: number;
+      }
+    > = {};
+    for (const r of rows) {
+      out[r.placeSlug] = {
+        messages: r.messages,
+        step: r.step,
+        status: r.status,
+        pendingAsk: r.pendingAsk ?? null,
+        updatedAt: r.updatedAt,
+      };
+    }
+    return out;
+  },
+});
+
+export const listInterestsBySlug = internalQuery({
+  args: { userId: v.id('users'), placeSlug: v.string() },
+  handler: async (ctx, { userId, placeSlug }) => {
+    const rows = await ctx.db
+      .query('placeInterests')
+      .withIndex('by_user', (q) => q.eq('userId', userId))
+      .collect();
+    return rows.filter((r) => r.placeSlug === placeSlug);
+  },
+});
+
+export const deleteInterest = internalMutation({
+  args: { interestId: v.id('placeInterests') },
+  handler: async (ctx, { interestId }) => {
+    await ctx.db.delete(interestId);
+  },
+});
+
 /**
  * Right-swipe: save only. Calling happens from My Places and always dials DEMO_CALL_TO.
  */
+export const findInterestBySlug = internalQuery({
+  args: { userId: v.id('users'), placeSlug: v.string() },
+  handler: async (ctx, { userId, placeSlug }) => {
+    const rows = await ctx.db
+      .query('placeInterests')
+      .withIndex('by_user', (q) => q.eq('userId', userId))
+      .collect();
+    return rows.find((r) => r.placeSlug === placeSlug) ?? null;
+  },
+});
+
 export const savePlace = action({
   args: {
     placeSlug: v.string(),
@@ -230,14 +617,20 @@ export const savePlace = action({
     unitType: v.string(),
     rent: v.number(),
     addressQuery: v.string(),
+    guestKey: v.optional(v.string()),
   },
-  handler: async (ctx, args): Promise<{ interestId: Id<'placeInterests'> }> => {
-    let userId = await getAuthUserId(ctx);
-    if (!userId) {
-      userId = await ctx.runQuery(internal.calls.demoUserId, {});
-    }
-    if (!userId) {
-      throw new ConvexError('Sign in (or run npm run seed) before saving a place.');
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ interestId: Id<'placeInterests'>; alreadySaved: boolean }> => {
+    const userId = await resolveActionUserId(ctx, args.guestKey);
+
+    const existing = await ctx.runQuery(internal.places.findInterestBySlug, {
+      userId,
+      placeSlug: args.placeSlug,
+    });
+    if (existing) {
+      return { interestId: existing._id, alreadySaved: true };
     }
 
     const interestId: Id<'placeInterests'> = await ctx.runMutation(internal.places.saveInterest, {
@@ -248,7 +641,7 @@ export const savePlace = action({
       unitType: args.unitType,
       rent: args.rent,
     });
-    return { interestId };
+    return { interestId, alreadySaved: false };
   },
 });
 
@@ -293,17 +686,15 @@ async function resolveOwnedInterest(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ctx: any,
   interestId: Id<'placeInterests'>,
+  guestKey?: string,
 ): Promise<{ interest: InterestRow; userId: Id<'users'> }> {
   const interest = (await ctx.runQuery(internal.places.getInterest, {
     interestId,
   })) as InterestRow | null;
   if (!interest) throw new ConvexError('Saved place not found.');
 
-  let userId = (await getAuthUserId(ctx)) as Id<'users'> | null;
-  if (!userId) {
-    userId = (await ctx.runQuery(internal.calls.demoUserId, {})) as Id<'users'> | null;
-  }
-  if (!userId || interest.userId !== userId) {
+  const userId = await resolveActionUserId(ctx, guestKey);
+  if (interest.userId !== userId) {
     throw new ConvexError('You can only call about your own saved places.');
   }
   return { interest, userId };
@@ -314,13 +705,18 @@ async function resolveOwnedInterest(
  * Phone is never taken from the client — only DEMO_CALL_TO is dialed.
  */
 export const callSaved = action({
-  args: { interestId: v.id('placeInterests') },
+  args: {
+    interestId: v.id('placeInterests'),
+    guestKey: v.optional(v.string()),
+    /** Extra questions from chat (asked first on the call). */
+    extraQuestions: v.optional(v.array(v.string())),
+  },
   handler: async (
     ctx,
-    { interestId },
+    { interestId, guestKey, extraQuestions },
   ): Promise<{ callId: Id<'calls'>; dialed: string }> => {
     const phone = demoDialNumber();
-    const { interest } = await resolveOwnedInterest(ctx, interestId);
+    const { interest } = await resolveOwnedInterest(ctx, interestId, guestKey);
 
     // Replace any pending schedule for this place.
     if (interest.scheduledCallId) {
@@ -337,7 +733,7 @@ export const callSaved = action({
 
     const started = await ctx.runAction(api.calls.startCall, {
       phone,
-      questions: questionsFor(interest),
+      questions: questionsFor(interest, extraQuestions ?? []),
       scheduleSource: 'immediate',
       interestId,
       isRecall: recall.isRecall,
@@ -359,13 +755,15 @@ export const scheduleCall = action({
     interestId: v.id('placeInterests'),
     delayMinutes: v.number(),
     reason: v.optional(v.string()),
+    guestKey: v.optional(v.string()),
+    extraQuestions: v.optional(v.array(v.string())),
   },
   handler: async (
     ctx,
-    { interestId, delayMinutes, reason },
+    { interestId, delayMinutes, reason, guestKey, extraQuestions },
   ): Promise<{ callId: Id<'calls'>; scheduledFor: number; dialed: string }> => {
     const phone = demoDialNumber();
-    const { interest, userId } = await resolveOwnedInterest(ctx, interestId);
+    const { interest, userId } = await resolveOwnedInterest(ctx, interestId, guestKey);
 
     const delayMs = clampScheduleDelayMs(delayMinutes * 60_000);
     const now = Date.now();
@@ -409,7 +807,7 @@ export const scheduleCall = action({
     const callId: Id<'calls'> = await ctx.runMutation(internal.calls.insertScheduledCall, {
       userId,
       toNumber: phone,
-      questions: questionsFor(interest),
+      questions: questionsFor(interest, extraQuestions ?? []),
       scheduledFor,
       scheduleSource: 'user',
       scheduleReason: reason ?? `Scheduled by you in ${Math.round(delayMs / 60_000)} min`,
@@ -425,9 +823,9 @@ export const scheduleCall = action({
 });
 
 export const cancelSchedule = action({
-  args: { interestId: v.id('placeInterests') },
-  handler: async (ctx, { interestId }): Promise<{ canceled: boolean }> => {
-    const { interest } = await resolveOwnedInterest(ctx, interestId);
+  args: { interestId: v.id('placeInterests'), guestKey: v.optional(v.string()) },
+  handler: async (ctx, { interestId, guestKey }): Promise<{ canceled: boolean }> => {
+    const { interest } = await resolveOwnedInterest(ctx, interestId, guestKey);
     if (!interest.scheduledCallId) return { canceled: false };
     await ctx.runMutation(internal.places.markScheduleCanceled, {
       callId: interest.scheduledCallId,

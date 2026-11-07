@@ -45,11 +45,14 @@ export default defineSchema({
     roommatePref: v.optional(v.union(v.literal('yes'), v.literal('maybe'), v.literal('no'))),
     onCouch: v.optional(v.boolean()),
     isDemo: v.optional(v.boolean()),
+    /** Browser-local guest identity so unsigned users don't share the demo user's list. */
+    guestKey: v.optional(v.string()),
   })
     .index('email', ['email'])
     .index('phone', ['phone'])
     .index('by_university', ['universityId'])
-    .index('by_isDemo', ['isDemo']),
+    .index('by_isDemo', ['isDemo'])
+    .index('by_guestKey', ['guestKey']),
 
   universities: defineTable({
     name: v.string(),
@@ -375,4 +378,28 @@ export default defineSchema({
   })
     .index('by_user', ['userId'])
     .index('by_slug', ['placeSlug']),
+
+  /** Per-user chatbot thread for a place (survives refresh; never shared across users). */
+  placeThreads: defineTable({
+    userId: v.id('users'),
+    placeSlug: v.string(),
+    messages: v.array(
+      v.object({
+        id: v.string(),
+        from: v.string(),
+        text: v.string(),
+        action: v.optional(v.string()),
+        at: v.number(),
+      }),
+    ),
+    step: v.number(),
+    status: v.string(),
+    /** Waiting for “when should I call?” — restored with the thread. */
+    pendingAsk: v.optional(
+      v.object({
+        questions: v.array(v.string()),
+      }),
+    ),
+    updatedAt: v.number(),
+  }).index('by_user_slug', ['userId', 'placeSlug']),
 });

@@ -29,6 +29,7 @@ type VapiRecording = {
 type VapiCall = {
   id: string;
   status?: string;
+  endedReason?: string;
   messages?: VapiMessage[];
   monitor?: { listenUrl?: string; controlUrl?: string };
   artifact?: {
@@ -205,6 +206,7 @@ export function createVapiVoice(): VoiceService | null {
       const messages = call.artifact?.messages ?? call.messages ?? [];
       return {
         status: call.status ?? 'unknown',
+        endedReason: call.endedReason,
         messages,
         recordingUrl: extractRecordingHint(call),
         structuredData: call.analysis?.structuredData,

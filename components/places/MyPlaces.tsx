@@ -6,7 +6,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAction, useQuery } from 'convex/react';
 import {
   ArrowLeft,
@@ -25,6 +25,7 @@ import { AGENT_COLOR } from '@/content/agents';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { placeBySlug } from '@/lib/swipeDeck';
+import { getGuestKey } from '@/lib/guestKey';
 
 const STATUS_LABEL: Record<string, string> = {
   scheduled: 'Scheduled',
@@ -83,7 +84,9 @@ function cleanError(err: unknown, fallback: string) {
 
 export function MyPlaces() {
   const router = useRouter();
-  const interests = useQuery(api.places.listMine);
+  const [guestKey, setGuestKey] = useState<string | undefined>();
+  useEffect(() => setGuestKey(getGuestKey()), []);
+  const interests = useQuery(api.places.listMine, guestKey ? { guestKey } : 'skip');
   const callSaved = useAction(api.places.callSaved);
   const scheduleCall = useAction(api.places.scheduleCall);
   const cancelSchedule = useAction(api.places.cancelSchedule);
@@ -105,7 +108,7 @@ export function MyPlaces() {
     setError(null);
     setBusyId(interestId);
     try {
-      const { callId } = await callSaved({ interestId });
+      const { callId } = await callSaved({ interestId, guestKey: getGuestKey() });
       router.push(`/app/calls/${callId}`);
     } catch (err) {
       setError(cleanError(err, 'Could not start the call'));
@@ -118,7 +121,7 @@ export function MyPlaces() {
     setError(null);
     setBusyId(interestId);
     try {
-      await scheduleCall({ interestId, delayMinutes });
+      await scheduleCall({ interestId, delayMinutes, guestKey: getGuestKey() });
       setScheduleOpenSlug(null);
     } catch (err) {
       setError(cleanError(err, 'Could not schedule the call'));
@@ -131,7 +134,7 @@ export function MyPlaces() {
     setError(null);
     setBusyId(interestId);
     try {
-      await cancelSchedule({ interestId });
+      await cancelSchedule({ interestId, guestKey: getGuestKey() });
     } catch (err) {
       setError(cleanError(err, 'Could not cancel the schedule'));
     } finally {

@@ -47,7 +47,27 @@ function useMockVoice(): boolean {
   return createVapiVoice() === null;
 }
 
-function mapVapiStatus(status: string): 'ringing' | 'live' | 'done' | 'failed' {
+/** True when the callee never picked up / line was busy (not a tech error). */
+export function isMissedCallReason(reason: string | undefined): boolean {
+  if (!reason) return false;
+  const r = reason.toLowerCase();
+  return (
+    /\bno[-_ ]?answer\b/.test(r) ||
+    /\bbusy\b/.test(r) ||
+    /\bcustomer[-_ ]did[-_ ]not[-_ ]answer\b/.test(r) ||
+    /\bdid not answer\b/.test(r) ||
+    /\bmissed\b/.test(r) ||
+    /\bvoicemail[-_ ]reached\b/.test(r) ||
+    /\bsilence[-_ ]timed[-_ ]out\b/.test(r) ||
+    /\btwilio[-_ ]failed[-_ ]to[-_ ]connect[-_ ]call\b/.test(r)
+  );
+}
+
+function mapVapiStatus(
+  status: string,
+  endedReason?: string,
+): 'ringing' | 'live' | 'done' | 'failed' {
+  if (isMissedCallReason(status) || isMissedCallReason(endedReason)) return 'failed';
   switch (status) {
     case 'queued':
     case 'scheduled':
@@ -57,6 +77,8 @@ function mapVapiStatus(status: string): 'ringing' | 'live' | 'done' | 'failed' {
     case 'forwarding':
       return 'live';
     case 'ended':
+      // Ended without a conversation often means they never picked up.
+      if (isMissedCallReason(endedReason)) return 'failed';
       return 'done';
     default:
       return status === 'busy' || status === 'no-answer' || status === 'failed' ? 'failed' : 'live';
@@ -69,6 +91,16 @@ function messageText(m: { message?: string; content?: string }): string {
   return '';
 }
 
+function isJunkCallLine(text: string, role: string): boolean {
+  const t = text.trim().toLowerCase();
+  if (!t) return true;
+  // Never store system / prompt scaffolding as dialogue.
+  if (role === 'system' || role === 'tool') return true;
+  if (/^you are the how\.?zingg/i.test(t)) return true;
+  if (/\bai phone assistant\b/.test(t) && t.length > 80) return true;
+  return false;
+}
+
 function mapMessages(
   messages: { role?: string; message?: string; content?: string; time?: number; secondsFromStart?: number }[],
   startedAt: number,
@@ -76,8 +108,8 @@ function mapMessages(
   const out: TranscriptLine[] = [];
   for (const m of messages) {
     const text = messageText(m);
-    if (!text) continue;
     const role = (m.role ?? '').toLowerCase();
+    if (!text || isJunkCallLine(text, role)) continue;
     const speaker: 'caller' | 'office' =
       role === 'user' || role === 'customer' ? 'office' : 'caller';
     const at =
@@ -536,7 +568,12 @@ export const startCall = action({
       }
     }
 
+    // Own the call as the place's user (guest/auth) — never the shared demo user when an interest is set.
     let userId = await getAuthUserId(ctx);
+    if (interestId) {
+      const interest = await ctx.runQuery(internal.places.getInterest, { interestId });
+      if (interest?.userId) userId = interest.userId;
+    }
     if (!userId) {
       userId = await ctx.runQuery(internal.calls.demoUserId, {});
     }
@@ -954,7 +991,7 @@ export const syncCall = action({
     if (!voice) return { status: call.status, ended: false };
 
     const snap = await voice.getCall(call.externalId);
-    let status = mapVapiStatus(snap.status);
+    let status = mapVapiStatus(snap.status, snap.endedReason);
     const startedAt = call.startedAt ?? Date.now();
     const transcript = mapMessages(snap.messages, startedAt);
     const answers = parseAnswers(snap.structuredData);
@@ -974,6 +1011,15 @@ export const syncCall = action({
       ended = true;
     }
 
+    // No pickup: ended with empty/tiny transcript → treat as missed.
+    const missed =
+      ended &&
+      (isMissedCallReason(snap.endedReason) ||
+        isMissedCallReason(snap.status) ||
+        (status === 'failed' && transcript.length === 0) ||
+        (status === 'done' && transcript.length === 0 && !answers));
+    if (missed) status = 'failed';
+
     const justEnded = ended && call.status !== 'done' && call.status !== 'failed';
 
     await ctx.runMutation(internal.calls.patchCall, {
@@ -986,6 +1032,9 @@ export const syncCall = action({
       recordingStatus: ended && !call.recordingStorageId ? 'pending' : call.recordingStatus,
       answers: answers ?? call.answers,
       endedAt: ended ? (call.endedAt ?? Date.now()) : undefined,
+      error: missed
+        ? `missed:${snap.endedReason ?? snap.status ?? 'no-answer'}`
+        : call.error,
       disclosureSaid: transcript.some((l) => l.speaker === 'caller' && startsWithDisclosure(l.text)),
     });
 
