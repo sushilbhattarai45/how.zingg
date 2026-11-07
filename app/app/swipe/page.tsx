@@ -1,11 +1,6 @@
-import { SwipeDeck } from '@/components/swipe/SwipeDeck';
+import { redirect } from 'next/navigation';
 
-export const metadata = { title: 'Find your place · how.zingg' };
-
+/** The deck now lives in the middle of /app. */
 export default function SwipePage() {
-  return (
-    <main className="bg-ink">
-      <SwipeDeck />
-    </main>
-  );
+  redirect('/app');
 }

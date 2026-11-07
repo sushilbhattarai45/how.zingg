@@ -1,7 +1,6 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -10,13 +9,12 @@ import { WorldProvider } from '@/components/world/WorldContext';
 import type { WorldHandle } from '@/components/world/World';
 import type { FocusTarget } from '@/components/world/cameraRig';
 import type { BotId } from '@/components/world/store';
-import { UniversityPicker } from '@/components/ui/UniversityPicker';
 import { SearchSheet } from '@/components/search/SearchSheet';
 import { StartCallSheet } from '@/components/calls/StartCallSheet';
 import { AgentDot } from '@/components/ui/AgentDot';
 import { buttonClass } from '@/components/ui/Button';
 import { AGENTS } from '@/content/agents';
-import { UserMenu } from '@/components/auth/UserMenu';
+import { TopNav } from '@/components/landing/TopNav';
 
 const World = dynamic(() => import('@/components/world/World').then((m) => m.World), { ssr: false });
 
@@ -40,7 +38,7 @@ const STATUS: Record<BotId, string> = {
 
 const EASE = [0.2, 0.8, 0.2, 1] as const;
 
-export function AppHome() {
+export function TeamHome() {
   const world = useRef<WorldHandle | null>(null);
   const [focus, setFocus] = useState<FocusTarget>('all');
   const [askOpen, setAskOpen] = useState(false);
@@ -67,15 +65,7 @@ export function AppHome() {
           className="absolute inset-0"
         />
 
-        <header className="absolute inset-x-0 top-0 flex items-center gap-3 bg-gradient-to-b from-ink/90 to-transparent px-4 pt-3 pb-8">
-          <Link href="/" aria-label="how.zingg home">
-            <Image src="/brand/mark-dark.svg" alt="how.zingg" width={32} height={29} />
-          </Link>
-          <div className="max-w-xs flex-1">
-            <UniversityPicker compact />
-          </div>
-          <UserMenu onCallNumber={() => setCallOpen(true)} />
-        </header>
+        <TopNav app onCallNumber={() => setCallOpen(true)} />
 
         <AnimatePresence>
           {focus !== 'all' && (
@@ -85,7 +75,7 @@ export function AppHome() {
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.25, ease: EASE }}
               onClick={() => go('all')}
-              className="absolute top-[72px] left-1/2 flex min-h-10 -translate-x-1/2 items-center gap-2 rounded-full bg-chalk px-4 text-[13px] font-bold text-ink shadow-[var(--shadow-float)]"
+              className="absolute top-[80px] left-1/2 flex min-h-10 -translate-x-1/2 items-center gap-2 rounded-full bg-chalk px-4 text-[13px] font-bold text-ink shadow-[var(--shadow-float)]"
             >
               <Shrink size={15} aria-hidden /> Whole home
             </motion.button>

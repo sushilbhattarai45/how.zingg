@@ -1,10 +1,11 @@
 'use client';
 
 /**
- * Address → Scout "searches" hardcoded USM realty (with photos) → Tinder-style swipe.
- * Right-swipe saves to My Places. Calling happens there and dials DEMO_CALL_TO only.
+ * The swipe deck (middle of /app). Address → Scout "searches" hardcoded USM realty (with photos)
+ * → Tinder-style swipe. Swipe LEFT (toward "My list") to add: it's saved to My Places and handed to
+ * the workspace (list + conversation). Swipe right to skip. Calling happens from My Places and
+ * dials DEMO_CALL_TO only.
  */
-import Link from 'next/link';
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -17,11 +18,11 @@ import {
   type PanInfo,
 } from 'motion/react';
 import { useAction } from 'convex/react';
-import { ArrowLeft, Check, ExternalLink, Footprints, Heart, IdCard, MapPin, Upload, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ExternalLink, Footprints, Heart, IdCard, MapPin } from 'lucide-react';
 import { BotAvatar, type BotMood } from '@/components/ui/BotAvatar';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { AgentDot } from '@/components/ui/AgentDot';
-import { AGENTS, AGENT_COLOR } from '@/content/agents';
+import { AGENT_COLOR } from '@/content/agents';
 import { api } from '@/convex/_generated/api';
 import {
   buildDeck,
@@ -47,7 +48,11 @@ const YES_LINES = [
 type Phase = 'address' | 'searching' | 'presenting' | 'reacting' | 'done';
 type Pick = { card: SwipeCard; tasks: TeamTask[] };
 
-export function SwipeDeck() {
+/** Add = toward the list on the left; skip = right. */
+const ADD = -1;
+const SKIP = 1;
+
+export function SwipeDeck({ onAdd, added = 0 }: { onAdd?: (card: SwipeCard) => void; added?: number }) {
   const reduced = useReducedMotion() ?? false;
   const savePlace = useAction(api.places.savePlace);
   const [address, setAddress] = useState('');
@@ -60,6 +65,7 @@ export function SwipeDeck() {
   const [line, setLine] = useState('Where should I look? Drop a campus or street near you.');
   const [picks, setPicks] = useState<Pick[]>([]);
   const [toss, setToss] = useState(0);
+  const [dir, setDir] = useState(SKIP);
   const [saving, setSaving] = useState(false);
   const [callError, setCallError] = useState<string | null>(null);
   const timers = useRef<number[]>([]);
@@ -125,9 +131,10 @@ export function SwipeDeck() {
     const card = deck[index];
     if (!card || phase !== 'presenting' || saving) return;
     setPhase('reacting');
+    setDir(yes ? ADD : SKIP);
     if (yes) {
       setMood('excited');
-      setLine(YES_LINES[picks.length % YES_LINES.length]!);
+      setLine(YES_LINES[(picks.length + added) % YES_LINES.length]!);
       setToss((n) => n + 1);
       setSaving(true);
       setCallError(null);
@@ -142,6 +149,7 @@ export function SwipeDeck() {
         });
         later(() => setPicks((p) => [{ card, tasks: tasksFor(card, tz) }, ...p]), 400);
       } catch (err) {
+        // Still show it in the workspace; the save can be retried from My Places.
         const msg =
           err instanceof Error
             ? err.message.replace(/^\[CONVEX[^\]]*\]\s*/i, '').replace(/^Uncaught Error:\s*/i, '')
@@ -149,6 +157,7 @@ export function SwipeDeck() {
         setCallError(msg);
       } finally {
         setSaving(false);
+        later(() => onAdd?.(card), 300);
       }
       setIndex((i) => i + 1);
       later(() => present(index + 1, deck), 1900);
@@ -164,17 +173,8 @@ export function SwipeDeck() {
   const next = deck[index + 1];
 
   return (
-    <div className="mx-auto grid min-h-dvh max-w-6xl gap-6 px-4 pt-4 pb-10 lg:grid-cols-[minmax(0,480px)_1fr] lg:gap-10">
-      {/* Left: Scout and the deck */}
-      <section aria-label="Places" className="flex flex-col">
+      <section aria-label="Places" className="flex min-w-0 flex-col">
         <header className="flex items-center gap-3">
-          <Link
-            href="/app"
-            aria-label="Back to your team"
-            className="grid size-11 place-items-center rounded-full border border-line text-text-2 hover:bg-raised hover:text-chalk"
-          >
-            <ArrowLeft size={20} />
-          </Link>
           <div className="flex-1">
             <h1 className="text-[22px] leading-7 font-extrabold">Find your place</h1>
             <p className="text-[13px] leading-[19px] text-text-3">
@@ -244,8 +244,8 @@ export function SwipeDeck() {
               Search with Scout
             </Button>
             <p className="text-[12px] leading-4 text-text-3">
-              Example places near {campusLabel()} (hardcoded photos — no live scrape yet). Right-swipe
-              saves to My Places; call from there rings <strong>your</strong> DEMO_CALL_TO only.
+              Example places near {campusLabel()} (hardcoded photos — no live scrape yet). Left-swipe
+              adds to My Places; call from there rings <strong>your</strong> DEMO_CALL_TO only.
             </p>
             {callError && (
               <p role="alert" className="text-[14px] font-semibold text-[#F25C8A]">
@@ -266,7 +266,7 @@ export function SwipeDeck() {
             {phase !== 'searching' && phase !== 'done' && (
               <>
                 {next && <CardView key={`${next.slug}-under`} card={next} under />}
-                <AnimatePresence custom={0}>
+                <AnimatePresence custom={dir}>
                   {card && (
                     <Draggable
                       key={card.slug}
@@ -317,24 +317,24 @@ export function SwipeDeck() {
           <>
             <div className="mt-5 flex gap-3">
               <Button
+                className="flex-1"
+                disabled={phase !== 'presenting' || saving}
+                onClick={() => void decide(true)}
+              >
+                <ArrowLeft size={18} strokeWidth={2.5} aria-hidden />
+                {saving ? 'Saving…' : 'Add to my list'}
+              </Button>
+              <Button
                 variant="secondary"
                 className="flex-1"
                 disabled={phase !== 'presenting' || saving}
                 onClick={() => void decide(false)}
               >
-                <X size={18} strokeWidth={2.5} aria-hidden /> Not for me
-              </Button>
-              <Button
-                className="flex-1"
-                disabled={phase !== 'presenting' || saving}
-                onClick={() => void decide(true)}
-              >
-                <Check size={18} strokeWidth={2.5} aria-hidden />
-                {saving ? 'Saving…' : 'Yes, save'}
+                Skip <ArrowRight size={18} strokeWidth={2.5} aria-hidden />
               </Button>
             </div>
             <p className="mt-2 text-center text-[12px] leading-4 text-text-3">
-              Swipe right to save · left to pass · call from My Places
+              Swipe left to add · right to skip · call from My Places
             </p>
             {picks.length > 0 && (
               <ButtonLink href="/app/places" variant="secondary" className="mt-3 w-full">
@@ -353,10 +353,6 @@ export function SwipeDeck() {
           </>
         )}
       </section>
-
-      {/* Right: the team gets to work on every yes */}
-      <TeamPanel picks={picks} />
-    </div>
   );
 }
 
@@ -449,28 +445,22 @@ function Draggable({
 }: {
   card: SwipeCard;
   disabled: boolean;
-  onDecide: (yes: boolean) => void;
+  onDecide: (add: boolean) => void;
   reduced: boolean;
 }) {
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-220, 220], [-12, 12]);
-  const yes = useTransform(x, [30, 120], [0, 1]);
-  const no = useTransform(x, [-120, -30], [1, 0]);
-  const [leaving, setLeaving] = useState<0 | 1 | -1>(0);
+  const addStamp = useTransform(x, [-120, -30], [1, 0]);
+  const skipStamp = useTransform(x, [30, 120], [0, 1]);
 
   const end = (_: unknown, info: PanInfo) => {
     const go =
-      info.offset.x > 110 || info.velocity.x > 600
-        ? 1
-        : info.offset.x < -110 || info.velocity.x < -600
-          ? -1
-          : 0;
+      info.offset.x < -110 || info.velocity.x < -600 ? ADD : info.offset.x > 110 || info.velocity.x > 600 ? SKIP : 0;
     if (!go) {
       animate(x, 0, { type: 'spring', stiffness: 300, damping: 26 });
       return;
     }
-    setLeaving(go);
-    onDecide(go === 1);
+    onDecide(go === ADD);
   };
 
   return (
@@ -483,31 +473,28 @@ function Draggable({
       onDragEnd={end}
       initial={{ scale: 0.96, y: 8, opacity: 0.6 }}
       animate={{ scale: 1, y: 0, opacity: 1 }}
-      exit={
-        reduced
-          ? { opacity: 0 }
-          : {
-              x: (leaving || (x.get() >= 0 ? 1 : -1)) * 520,
-              rotate: (leaving || 1) * 18,
-              opacity: 0,
-              transition: { duration: 0.4, ease: EASE },
-            }
-      }
+      variants={{
+        exit: (d: number) =>
+          reduced
+            ? { opacity: 0 }
+            : { x: d * 520, rotate: d * 18, opacity: 0, transition: { duration: 0.4, ease: EASE } },
+      }}
+      exit="exit"
       transition={{ duration: 0.3, ease: EASE }}
     >
       <CardView card={card} />
-      {/* Stamps */}
+      {/* Stamps: ADD when dragging left (toward My list), SKIP when dragging right */}
       <motion.span
-        style={{ opacity: yes }}
-        className="pointer-events-none absolute top-6 left-5 -rotate-12 rounded-[12px] border-4 border-window px-3 py-1 text-[22px] font-extrabold text-window"
+        style={{ opacity: addStamp }}
+        className="pointer-events-none absolute top-6 right-5 rotate-12 rounded-[12px] border-4 border-window px-3 py-1 text-[22px] font-extrabold text-window"
       >
-        YES
+        ADD
       </motion.span>
       <motion.span
-        style={{ opacity: no }}
-        className="pointer-events-none absolute top-6 right-5 rotate-12 rounded-[12px] border-4 border-bad px-3 py-1 text-[22px] font-extrabold text-bad"
+        style={{ opacity: skipStamp }}
+        className="pointer-events-none absolute top-6 left-5 -rotate-12 rounded-[12px] border-4 border-bad px-3 py-1 text-[22px] font-extrabold text-bad"
       >
-        NOPE
+        SKIP
       </motion.span>
     </motion.div>
   );
@@ -580,115 +567,6 @@ function CardView({ card, under }: { card: SwipeCard; under?: boolean }) {
   );
 }
 
-/* ───────────── Team panel ───────────── */
-
-function TeamPanel({ picks }: { picks: Pick[] }) {
-  const crew = AGENTS.filter((a) => a.id === 'caller' || a.id === 'packet' || a.id === 'closer');
-  return (
-    <section aria-label="Your team" className="lg:pt-[60px]">
-      <div className="rounded-[20px] border border-line bg-surface p-4">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-[18px] leading-6 font-bold">Your team</h2>
-          <div className="flex -space-x-2">
-            {crew.map((a) => (
-              <span key={a.id} className="rounded-full bg-surface">
-                <BotAvatar
-                  color={a.color}
-                  mood={picks.length ? 'thinking' : 'idle'}
-                  size={34}
-                  label={`${a.name}, ${picks.length ? 'working' : 'waiting'}`}
-                />
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {picks.length === 0 ? (
-          <p className="mt-3 text-text-2">
-            Right-swipe a place to save it. Then open My Places and tap Call — Caller rings your{' '}
-            DEMO_CALL_TO number, not the real office.
-          </p>
-        ) : (
-          <ol className="mt-4 flex flex-col gap-4">
-            <AnimatePresence initial={false}>
-              {picks.map(({ card, tasks }) => (
-                <motion.li
-                  key={card.slug}
-                  layout
-                  initial={{ opacity: 0, y: -12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.35, ease: EASE }}
-                  className="rounded-[16px] border border-line bg-ink/40 p-3"
-                >
-                  <p className="flex items-center justify-between gap-2 font-bold">
-                    {card.title} · ${card.rent}
-                    <span className="rounded-full bg-window-dim px-2 py-0.5 text-[12px] leading-4 font-bold text-good">
-                      Saved
-                    </span>
-                  </p>
-                  <ul className="mt-2 flex flex-col gap-2">
-                    {tasks.map((t, i) => (
-                      <TaskRow key={t.agent} task={t} delay={0.25 + i * 0.35} />
-                    ))}
-                  </ul>
-                </motion.li>
-              ))}
-            </AnimatePresence>
-          </ol>
-        )}
-        {picks.length > 0 && (
-          <ButtonLink href="/app/places" className="mt-4 w-full">
-            <Heart size={16} aria-hidden /> Go to My Places
-          </ButtonLink>
-        )}
-        <p className="mt-4 text-[12px] leading-4 text-text-3">
-          Example data + demo dial. Real estate phones are never called from this flow.
-        </p>
-      </div>
-    </section>
-  );
-}
-
-function TaskRow({ task, delay }: { task: TeamTask; delay: number }) {
-  const [asked, setAsked] = useState(false);
-  const name = AGENTS.find((a) => a.id === task.agent)!.name;
-  return (
-    <motion.li
-      initial={{ opacity: 0, x: 12 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay, duration: 0.3, ease: EASE }}
-      className="flex items-start gap-2.5 text-[13px] leading-[19px]"
-    >
-      <span className="relative mt-1.5">
-        <AgentDot color={AGENT_COLOR[task.agent]} size={10} />
-        <motion.span
-          className="absolute inset-0 rounded-full"
-          style={{ background: AGENT_COLOR[task.agent] }}
-          animate={{ scale: [1, 2.2], opacity: [0.5, 0] }}
-          transition={{ duration: 1.4, repeat: Infinity, delay }}
-        />
-      </span>
-      <span className="flex-1">
-        <span className="font-bold">{name}</span> <span className="text-text-2">{task.text}</span>
-        {task.action && (
-          <span className="mt-1.5 block">
-            {asked ? (
-              <span className="text-text-3">Document upload arrives in the next build.</span>
-            ) : (
-              <button
-                onClick={() => setAsked(true)}
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line px-3 text-[12px] font-bold hover:bg-raised"
-              >
-                <Upload size={13} aria-hidden /> {task.action}
-              </button>
-            )}
-          </span>
-        )}
-      </span>
-    </motion.li>
-  );
-}
-
 /** A little paper file that flies from Scout toward the team panel on every yes. */
 function Toss({ active, reduced }: { active: boolean; reduced: boolean }) {
   if (!active || reduced) return null;
@@ -697,7 +575,7 @@ function Toss({ active, reduced }: { active: boolean; reduced: boolean }) {
       aria-hidden
       className="pointer-events-none absolute top-6 left-10 z-20 h-7 w-6 rounded-[4px] border border-line bg-white shadow"
       initial={{ x: 0, y: 0, rotate: 0, opacity: 1 }}
-      animate={{ x: [0, 220, 520], y: [0, -90, 40], rotate: [0, 160, 340], opacity: [1, 1, 0] }}
+      animate={{ x: [0, -160, -380], y: [0, -90, 30], rotate: [0, -160, -340], opacity: [1, 1, 0] }}
       transition={{ duration: 0.65, ease: 'easeOut' }}
     />
   );
@@ -713,8 +591,8 @@ function KeyboardSwipe({ enabled, onDecide }: { enabled: boolean; onDecide: (yes
     if (!enabled) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === 'ArrowRight') cb.current(true);
-      if (e.key === 'ArrowLeft') cb.current(false);
+      if (e.key === 'ArrowLeft') cb.current(true);
+      if (e.key === 'ArrowRight') cb.current(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

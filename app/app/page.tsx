@@ -1,7 +1,15 @@
-import { AppHome } from './AppHome';
+import { TopNav } from '@/components/landing/TopNav';
+import { Workspace } from '@/components/workspace/Workspace';
 
-export const metadata = { title: 'Your team · how.zingg' };
+export const metadata = { title: 'Find your place · how.zingg' };
 
-export default function Page() {
-  return <AppHome />;
+export default function AppPage() {
+  return (
+    <>
+      <TopNav app />
+      <main className="bg-ink">
+        <Workspace />
+      </main>
+    </>
+  );
 }
