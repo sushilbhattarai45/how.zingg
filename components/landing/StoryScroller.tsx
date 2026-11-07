@@ -47,8 +47,6 @@ export function StoryScroller() {
 function Hero() {
   const store = useWorldStore();
   const [worldReady, setWorldReady] = useState(false);
-  const [playing, setPlaying] = useState(true);
-  const [ended, setEnded] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [roommatesOpen, setRoommatesOpen] = useState(false);
   const progress = useRef(0);
@@ -80,7 +78,6 @@ function Hero() {
       apply(progress.current);
       return;
     }
-    if (!playing) return;
     let raf = 0;
     let last = performance.now();
     const tick = (now: number) => {
@@ -88,23 +85,12 @@ function Hero() {
       last = now;
       progress.current = Math.min(1, progress.current + dt / SHOW_SECONDS);
       apply(progress.current);
-      if (progress.current >= 1) {
-        setEnded(true);
-        setPlaying(false);
-        return;
-      }
+      if (progress.current >= 1) return; // ends with the team at work
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [worldReady, playing, apply, store]);
-
-  const replay = () => {
-    progress.current = 0;
-    apply(0);
-    setEnded(false);
-    setPlaying(true);
-  };
+  }, [worldReady, apply, store]);
 
   const attachWorld = useCallback((h: WorldHandle | null) => {
     if (!h) return;
@@ -131,13 +117,8 @@ function Hero() {
 
       {/* Hero card */}
       <div className="absolute inset-x-0 top-[58svh] bottom-0 px-4 pt-3 pb-4 md:inset-x-auto md:top-1/2 md:bottom-auto md:left-[max(16px,5vw)] md:-translate-y-1/2 md:p-0">
-        <div className="theme-light h-full overflow-y-auto rounded-[20px] bg-paper p-6 shadow-[0_12px_40px_rgba(17,16,18,.35)] md:h-auto md:w-[440px]">
-          <HeroCard
-            playing={playing}
-            ended={ended}
-            onToggle={() => setPlaying((v) => !v)}
-            onReplay={replay}
-          />
+        <div className="theme-light h-full overflow-y-auto md:overflow-visible rounded-[20px] bg-paper p-6 shadow-[0_12px_40px_rgba(17,16,18,.35)] md:h-auto md:w-[440px]">
+          <HeroCard />
         </div>
       </div>
 
