@@ -1,6 +1,6 @@
 /**
- * Swipe deck: hardcoded realty near USM (example data + local images). No scraping.
- * Scout "searches" from an address the student types; results are always this seeded set for now.
+ * Swipe deck: hardcoded realty near USM (example data + photo galleries). No scraping.
+ * Scout auto-loads this seeded set with a short search animation.
  */
 import realty from '@/seed/realtyPlaces.json';
 import { formatDual, zonedToUtc } from '@/lib/time';
@@ -19,6 +19,8 @@ export type SwipeCard = {
   sourceUrl: string;
   pitch: string;
   image: string;
+  /** Hero + interior shots the student can browse before adding. */
+  gallery: string[];
   hue: number;
 };
 
@@ -40,22 +42,29 @@ export function buildDeck(addressQuery = ''): SwipeCard[] {
     return { p, i, hit };
   });
   scored.sort((a, b) => a.hit - b.hit || (a.p.walkMin ?? 99) - (b.p.walkMin ?? 99));
-  return scored.map(({ p, i }) => ({
-    slug: p.slug,
-    title: p.title,
-    address: p.address,
-    unitType: p.unitType,
-    rent: p.rent,
-    deposit: p.deposit,
-    walkMin: p.walkMin,
-    noSSN: p.noSSN,
-    officeName: p.officeName,
-    availableFrom: p.availableFrom,
-    sourceUrl: p.sourceUrl,
-    pitch: p.pitch,
-    image: p.image,
-    hue: (i * 0.17) % 1,
-  }));
+  return scored.map(({ p, i }) => {
+    const gallery =
+      'gallery' in p && Array.isArray(p.gallery) && p.gallery.length > 0
+        ? (p.gallery as string[])
+        : [p.image];
+    return {
+      slug: p.slug,
+      title: p.title,
+      address: p.address,
+      unitType: p.unitType,
+      rent: p.rent,
+      deposit: p.deposit,
+      walkMin: p.walkMin,
+      noSSN: p.noSSN,
+      officeName: p.officeName,
+      availableFrom: p.availableFrom,
+      sourceUrl: p.sourceUrl,
+      pitch: p.pitch,
+      image: p.image,
+      gallery,
+      hue: (i * 0.17) % 1,
+    };
+  });
 }
 
 export function campusLabel(): string {

@@ -29,6 +29,9 @@ export function TopNav({ app = false, onCallNumber }: { app?: boolean; onCallNum
               <Link href="/app" className="hover:text-chalk">
                 Find a place
               </Link>
+              <Link href="/app/roommates" className="hover:text-chalk">
+                Roommate Space
+              </Link>
               <Link href="/app/team" className="hover:text-chalk">
                 Your team
               </Link>

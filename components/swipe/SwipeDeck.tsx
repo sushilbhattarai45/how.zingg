@@ -1,10 +1,8 @@
 'use client';
 
 /**
- * The swipe deck (middle of /app). Address → Scout "searches" hardcoded USM realty (with photos)
- * → Tinder-style swipe. Swipe LEFT (toward "My list") to add: it's saved to My Places and handed to
- * the workspace (list + conversation). Swipe right to skip. Calling happens from My Places and
- * dials DEMO_CALL_TO only.
+ * Swipe deck (middle of /app). Auto-starts Scout search animation → place cards with
+ * photo galleries. Swipe left to add to My list; right to skip.
  */
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -18,7 +16,19 @@ import {
   type PanInfo,
 } from 'motion/react';
 import { useAction } from 'convex/react';
-import { ArrowLeft, ArrowRight, ExternalLink, Footprints, Heart, IdCard, MapPin } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  Footprints,
+  Heart,
+  IdCard,
+  MapPin,
+  Maximize2,
+  X,
+} from 'lucide-react';
 import { BotAvatar, type BotMood } from '@/components/ui/BotAvatar';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { AgentDot } from '@/components/ui/AgentDot';
@@ -46,7 +56,7 @@ const YES_LINES = [
   'Wishlisted! Open My Places when you want Caller to ring you.',
 ];
 
-type Phase = 'address' | 'searching' | 'presenting' | 'reacting' | 'done';
+type Phase = 'searching' | 'presenting' | 'reacting' | 'done';
 type Pick = { card: SwipeCard; tasks: TeamTask[] };
 
 /** Add = toward the list on the left; skip = right. */
@@ -58,22 +68,19 @@ export function SwipeDeck({
   added = 0,
   addedSlugs = [],
 }: {
-  /** Fired after a place is saved (or save fails). Passes interestId when Convex save succeeded. */
   onAdd?: (card: SwipeCard, interestId: string | null) => void;
   added?: number;
-  /** Slugs already on My list — cannot add again. */
   addedSlugs?: string[];
 }) {
   const reduced = useReducedMotion() ?? false;
   const savePlace = useAction(api.places.savePlace);
-  const [address, setAddress] = useState('');
-  const [addressQuery, setAddressQuery] = useState('');
+  const [addressQuery] = useState(campusLabel());
   const [deck, setDeck] = useState<SwipeCard[]>([]);
-  const [phase, setPhase] = useState<Phase>('address');
+  const [phase, setPhase] = useState<Phase>('searching');
   const [step, setStep] = useState(0);
   const [index, setIndex] = useState(0);
-  const [mood, setMood] = useState<BotMood>('idle');
-  const [line, setLine] = useState('Where should I look in ' + campusLabel() + '?');
+  const [mood, setMood] = useState<BotMood>('searching');
+  const [line, setLine] = useState('Looking near campus…');
   const [picks, setPicks] = useState<Pick[]>([]);
   const [toss, setToss] = useState(0);
   const [dir, setDir] = useState(SKIP);
@@ -83,60 +90,104 @@ export function SwipeDeck({
   const later = (fn: () => void, ms: number) =>
     timers.current.push(window.setTimeout(fn, reduced ? 0 : ms));
 
-  const searchSteps = useCallback(
-    (q: string) => [
-      `Reading places near “${q || campusLabel()}”…`,
-      'Checking walk times, move-in dates, and no-SSN notes…',
-      'Ranking the best matches for you…',
-    ],
-    [],
+  const present = useCallback((i: number, cards: SwipeCard[]) => {
+    const card = cards[i];
+    if (!card) {
+      setPhase('done');
+      setMood('happy');
+      setLine("That's everyone for now! I'll keep looking and ping you when new places show up.");
+      return;
+    }
+    setPhase('presenting');
+    setMood(i === 0 ? 'excited' : 'happy');
+    setLine(
+      i === 0
+        ? `Found ${cards.length} places near campus — browse the photos, then add the ones you like.`
+        : card.pitch,
+    );
+  }, []);
+
+  const clearTimers = () => {
+    timers.current.forEach(clearTimeout);
+    timers.current = [];
+  };
+
+  const startSearch = useCallback(
+    (quick = false) => {
+      const cards = buildDeck(campusLabel());
+      setDeck(cards);
+      setIndex(0);
+      setPicks([]);
+      setPhase('searching');
+      setMood('searching');
+      const steps = [
+        'Scanning places near Scianna Hall…',
+        'Checking walk times and no-SSN notes…',
+        'Lining up photos for you…',
+      ];
+      setLine(steps[0]!);
+      setStep(0);
+      clearTimers();
+      const pace = quick || reduced ? 0 : 900;
+      steps.forEach((s, i) =>
+        later(() => {
+          setStep(i);
+          setLine(s);
+        }, i * pace),
+      );
+      later(() => present(0, cards), steps.length * pace + (pace ? 280 : 50));
+    },
+    // later/clearTimers use refs; present + reduced are the real deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [present, reduced],
   );
 
-  const present = useCallback(
-    (i: number, cards: SwipeCard[]) => {
-      const card = cards[i];
-      if (!card) {
+  // Run once on mount. Do NOT depend on startSearch — that was clearing timers on re-render
+  // (reduced motion hydrates late) and leaving phase stuck on "searching".
+  useEffect(() => {
+    const cards = buildDeck(campusLabel());
+    setDeck(cards);
+    setIndex(0);
+    setPicks([]);
+    setPhase('searching');
+    setMood('searching');
+    const steps = [
+      'Scanning places near Scianna Hall…',
+      'Checking walk times and no-SSN notes…',
+      'Lining up photos for you…',
+    ];
+    setLine(steps[0]!);
+    setStep(0);
+
+    const ids: number[] = [];
+    const schedule = (fn: () => void, ms: number) => {
+      ids.push(window.setTimeout(fn, ms));
+    };
+    const pace = 900;
+    steps.forEach((s, i) =>
+      schedule(() => {
+        setStep(i);
+        setLine(s);
+      }, i * pace),
+    );
+    schedule(() => {
+      const first = cards[0];
+      if (!first) {
         setPhase('done');
         setMood('happy');
         setLine("That's everyone for now! I'll keep looking and ping you when new places show up.");
         return;
       }
       setPhase('presenting');
-      setMood(i === 0 ? 'excited' : 'happy');
-      setLine(i === 0 ? `Found ${cards.length} places! First up: ${card.pitch}` : card.pitch);
-    },
-    [],
-  );
+      setMood('excited');
+      setLine(
+        `Found ${cards.length} places near campus — browse the photos, then add the ones you like.`,
+      );
+    }, steps.length * pace + 280);
 
-  const startSearch = (q: string) => {
-    const trimmed = q.trim();
-    if (!trimmed) {
-      setCallError('Enter an address or campus building first.');
-      return;
-    }
-    setCallError(null);
-    setAddressQuery(trimmed);
-    const cards = buildDeck(trimmed);
-    setDeck(cards);
-    setIndex(0);
-    setPicks([]);
-    setPhase('searching');
-    setMood('searching');
-    const steps = searchSteps(trimmed);
-    setLine(steps[0]!);
-    setStep(0);
-    timers.current.forEach(clearTimeout);
-    timers.current = [];
-    steps.forEach((s, i) =>
-      later(() => {
-        setStep(i);
-        setLine(s);
-      }, i * 1100),
-    );
-    later(() => present(0, cards), steps.length * 1100 + 300);
-  };
-
-  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+    return () => ids.forEach(clearTimeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const decide = async (yes: boolean) => {
     const card = deck[index];
@@ -178,7 +229,6 @@ export function SwipeDeck({
           later(() => setPicks((p) => [{ card, tasks: tasksFor(card, tz) }, ...p]), 400);
         }
       } catch (err) {
-        // Still show it in the workspace; the save can be retried from My Places.
         const msg =
           err instanceof Error
             ? err.message.replace(/^\[CONVEX[^\]]*\]\s*/i, '').replace(/^Uncaught Error:\s*/i, '')
@@ -202,186 +252,138 @@ export function SwipeDeck({
   const next = deck[index + 1];
 
   return (
-      <section aria-label="Places" className="flex min-w-0 flex-col">
-        <header className="flex items-center gap-3">
-          <div className="flex-1">
-            <h1 className="text-[22px] leading-7 font-extrabold">Find your place</h1>
-            <p className="text-[13px] leading-[19px] text-text-3">
-              {phase === 'address'
-                ? 'Enter an address — Scout will look nearby'
-                : phase === 'searching'
-                  ? 'Scout is searching…'
-                  : deck.length
-                    ? `${Math.min(index + 1, deck.length)} of ${deck.length} · ${campusLabel()}`
-                    : campusLabel()}
-            </p>
-          </div>
-        </header>
-
-        {/* Scout presents */}
-        <div className="mt-4 flex items-center gap-3">
-          <div className="relative shrink-0">
-            <BotAvatar color={AGENT_COLOR.scout} mood={mood} size={84} label={`Scout, ${mood}`} />
-            <Toss key={toss} active={toss > 0} reduced={reduced} />
-          </div>
-          <div className="relative min-h-[64px] flex-1 rounded-[16px] border border-line bg-surface px-4 py-3">
-            <span
-              aria-hidden
-              className="absolute top-1/2 -left-[7px] size-3 -translate-y-1/2 rotate-45 border-b border-l border-line bg-surface"
-            />
-            <p className="label-caps flex items-center gap-1.5 text-text-3">
-              <AgentDot color={AGENT_COLOR.scout} size={8} /> Scout
-            </p>
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.p
-                key={line}
-                role="status"
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.22, ease: EASE }}
-                className="mt-0.5 text-[15px] leading-[22px] font-semibold"
-              >
-                {line}
-              </motion.p>
-            </AnimatePresence>
-          </div>
+    <section aria-label="Places" className="flex min-w-0 flex-col">
+      <header className="flex items-center gap-3">
+        <div className="flex-1">
+          <h1 className="text-[22px] leading-7 font-extrabold">Find your place</h1>
+          <p className="text-[13px] leading-[19px] text-text-3">
+            {phase === 'searching'
+              ? 'Scout is searching…'
+              : deck.length
+                ? `${Math.min(index + 1, deck.length)} of ${deck.length} · ${campusLabel()}`
+                : campusLabel()}
+          </p>
         </div>
+      </header>
 
-        {phase === 'address' && (
-          <form
-            className="mt-5 flex flex-col gap-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              startSearch(address);
-            }}
-          >
-            <label className="flex flex-col gap-1.5">
-              <span className="text-[13px] font-bold">Where should I look in {campusLabel()}?</span>
-              <span className="flex items-center gap-2 rounded-[16px] border border-line bg-surface px-3">
-                <MapPin size={18} className="text-scout" aria-hidden />
-                <input
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="e.g. Scianna Hall, Near Wilber Hall"
-                  className="h-12 min-w-0 flex-1 bg-transparent text-[15px] font-semibold outline-none placeholder:text-text-3"
-                  autoFocus
+      <div className="mt-4 flex items-center gap-3">
+        <div className="relative shrink-0">
+          <BotAvatar color={AGENT_COLOR.scout} mood={mood} size={72} label={`Scout, ${mood}`} />
+          <Toss key={toss} active={toss > 0} reduced={reduced} />
+        </div>
+        <div className="relative min-h-[56px] flex-1 rounded-[16px] border border-line bg-surface px-4 py-3">
+          <span
+            aria-hidden
+            className="absolute top-1/2 -left-[7px] size-3 -translate-y-1/2 rotate-45 border-b border-l border-line bg-surface"
+          />
+          <p className="label-caps flex items-center gap-1.5 text-text-3">
+            <AgentDot color={AGENT_COLOR.scout} size={8} /> Scout
+          </p>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.p
+              key={line}
+              role="status"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.22, ease: EASE }}
+              className="mt-0.5 text-[15px] leading-[22px] font-semibold"
+            >
+              {line}
+            </motion.p>
+          </AnimatePresence>
+        </div>
+      </div>
+
+      <div className="relative mt-5 h-[520px] sm:h-[560px]">
+        <AnimatePresence>
+          {phase === 'searching' && (
+            <Searching key="searching" step={step} steps={3} reduced={reduced} />
+          )}
+        </AnimatePresence>
+        {phase !== 'searching' && phase !== 'done' && (
+          <>
+            {next && <CardView key={`${next.slug}-under`} card={next} under />}
+            <AnimatePresence custom={dir}>
+              {card && (
+                <Draggable
+                  key={card.slug}
+                  card={card}
+                  disabled={phase !== 'presenting' || saving}
+                  onDecide={decide}
+                  reduced={reduced}
                 />
-              </span>
-            </label>
-            <Button type="submit" className="w-full">
-              Search with Agent Scout
-            </Button>
-            {/* <p className="text-[12px] leading-4 text-text-3">
-              Example places near {campusLabel()} (hardcoded photos — no live scrape yet). Left-swipe
-              adds to My Places; call from there rings <strong>your</strong> DEMO_CALL_TO only.
-            </p> */}
-            {callError && (
-              <p role="alert" className="text-[14px] font-semibold text-[#F25C8A]">
-                {callError}
-              </p>
-            )}
-          </form>
-        )}
-
-        {/* Deck */}
-        {phase !== 'address' && (
-          <div className="relative mt-5 h-[440px]">
-            <AnimatePresence>
-              {phase === 'searching' && (
-                <Searching key="searching" step={step} steps={3} reduced={reduced} />
               )}
             </AnimatePresence>
-            {phase !== 'searching' && phase !== 'done' && (
-              <>
-                {next && <CardView key={`${next.slug}-under`} card={next} under />}
-                <AnimatePresence custom={dir}>
-                  {card && (
-                    <Draggable
-                      key={card.slug}
-                      card={card}
-                      disabled={phase !== 'presenting' || saving}
-                      onDecide={decide}
-                      reduced={reduced}
-                    />
-                  )}
-                </AnimatePresence>
-              </>
-            )}
-            {phase === 'done' && (
-              <div className="grid h-full place-items-center rounded-[20px] border border-dashed border-line p-6 text-center">
-                <div>
-                  <p className="text-[18px] leading-6 font-extrabold">
-                    {picks.length ? `${picks.length} on your wishlist` : 'No picks this time'}
-                  </p>
-                  <p className="mt-1 text-text-2">
-                    {hiddenScams()
-                      ? `${hiddenScams()} scam listing hidden. `
-                      : ''}
-                    Searched near “{addressQuery}”.
-                  </p>
-                  {picks.length > 0 && (
-                    <ButtonLink href="/app/places" className="mt-4 w-full">
-                      <Heart size={16} aria-hidden /> Go to My Places
-                    </ButtonLink>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPhase('address');
-                      setMood('idle');
-                      setLine('Want to try another address?');
-                    }}
-                    className="mt-4 font-bold text-window underline underline-offset-2"
-                  >
-                    Search again
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {phase !== 'address' && phase !== 'done' && phase !== 'searching' && (
-          <>
-            <div className="mt-5 flex gap-3">
-              <Button
-                className="flex-1"
-                disabled={phase !== 'presenting' || saving}
-                onClick={() => void decide(true)}
-              >
-                <ArrowLeft size={18} strokeWidth={2.5} aria-hidden />
-                {saving ? 'Saving…' : 'Add to my list'}
-              </Button>
-              <Button
-                variant="secondary"
-                className="flex-1"
-                disabled={phase !== 'presenting' || saving}
-                onClick={() => void decide(false)}
-              >
-                Skip <ArrowRight size={18} strokeWidth={2.5} aria-hidden />
-              </Button>
-            </div>
-            <p className="mt-2 text-center text-[12px] leading-4 text-text-3">
-              Swipe left to add · right to skip · call from My Places
-            </p>
-            {picks.length > 0 && (
-              <ButtonLink href="/app/places" variant="secondary" className="mt-3 w-full">
-                <Heart size={16} aria-hidden /> My Places ({picks.length})
-              </ButtonLink>
-            )}
-            {callError && (
-              <p role="alert" className="mt-2 text-center text-[13px] font-semibold text-[#F25C8A]">
-                {callError}
-              </p>
-            )}
-            <KeyboardSwipe
-              enabled={phase === 'presenting' && !saving}
-              onDecide={(y) => void decide(y)}
-            />
           </>
         )}
-      </section>
+        {phase === 'done' && (
+          <div className="grid h-full place-items-center rounded-[20px] border border-dashed border-line p-6 text-center">
+            <div>
+              <p className="text-[18px] leading-6 font-extrabold">
+                {picks.length ? `${picks.length} on your wishlist` : 'No picks this time'}
+              </p>
+              <p className="mt-1 text-text-2">
+                {hiddenScams() ? `${hiddenScams()} scam listing hidden. ` : ''}
+                Places near {campusLabel()}.
+              </p>
+              {picks.length > 0 && (
+                <ButtonLink href="/app/places" className="mt-4 w-full">
+                  <Heart size={16} aria-hidden /> Go to My Places
+                </ButtonLink>
+              )}
+              <button
+                type="button"
+                onClick={() => startSearch()}
+                className="mt-4 font-bold text-window underline underline-offset-2"
+              >
+                Show places again
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {phase !== 'done' && phase !== 'searching' && (
+        <>
+          <div className="mt-5 flex gap-3">
+            <Button
+              className="flex-1"
+              disabled={phase !== 'presenting' || saving}
+              onClick={() => void decide(true)}
+            >
+              <ArrowLeft size={18} strokeWidth={2.5} aria-hidden />
+              {saving ? 'Saving…' : 'Add to my list'}
+            </Button>
+            <Button
+              variant="secondary"
+              className="flex-1"
+              disabled={phase !== 'presenting' || saving}
+              onClick={() => void decide(false)}
+            >
+              Skip <ArrowRight size={18} strokeWidth={2.5} aria-hidden />
+            </Button>
+          </div>
+          <p className="mt-2 text-center text-[12px] leading-4 text-text-3">
+            Tap photos to enlarge · swipe left to add · right to skip
+          </p>
+          {picks.length > 0 && (
+            <ButtonLink href="/app/places" variant="secondary" className="mt-3 w-full">
+              <Heart size={16} aria-hidden /> My Places ({picks.length})
+            </ButtonLink>
+          )}
+          {callError && (
+            <p role="alert" className="mt-2 text-center text-[13px] font-semibold text-[#F25C8A]">
+              {callError}
+            </p>
+          )}
+          <KeyboardSwipe
+            enabled={phase === 'presenting' && !saving}
+            onDecide={(y) => void decide(y)}
+          />
+        </>
+      )}
+    </section>
   );
 }
 
@@ -414,7 +416,6 @@ function Searching({
       className="absolute inset-0 overflow-hidden rounded-[20px] border border-line bg-[#20262a]"
       aria-hidden
     >
-      {/* A simple map: streets and a campus block */}
       <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 size-full opacity-60">
         {[20, 45, 70].map((y) => (
           <line key={`h${y}`} x1="0" y1={y} x2="100" y2={y + 6} stroke="#3a4448" strokeWidth="3" />
@@ -424,16 +425,16 @@ function Searching({
         ))}
         <rect x="40" y="50" width="16" height="12" rx="3" fill="#6dbd13" opacity="0.35" />
       </svg>
-      {/* Radar sweep */}
       {!reduced && (
         <motion.div
           className="absolute top-1/2 left-1/2 size-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full"
-          style={{ background: 'conic-gradient(from 0deg, rgba(61,184,201,0.35), rgba(61,184,201,0) 70deg)' }}
+          style={{
+            background: 'conic-gradient(from 0deg, rgba(61,184,201,0.35), rgba(61,184,201,0) 70deg)',
+          }}
           animate={{ rotate: 360 }}
           transition={{ duration: 2.2, repeat: Infinity, ease: 'linear' }}
         />
       )}
-      {/* Pins pop in as Scout finds places */}
       {PINS.map(([x, y], i) => (
         <motion.span
           key={i}
@@ -441,7 +442,7 @@ function Searching({
           style={{ left: `${x}%`, top: `${y}%` }}
           initial={{ opacity: 0, y: -8, scale: 0.6 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ delay: reduced ? 0 : 0.4 + i * 0.45, duration: 0.35, ease: EASE }}
+          transition={{ delay: reduced ? 0 : 0.35 + i * 0.35, duration: 0.35, ease: EASE }}
         >
           <svg width="22" height="28" viewBox="0 0 22 28">
             <path
@@ -484,7 +485,11 @@ function Draggable({
 
   const end = (_: unknown, info: PanInfo) => {
     const go =
-      info.offset.x < -110 || info.velocity.x < -600 ? ADD : info.offset.x > 110 || info.velocity.x > 600 ? SKIP : 0;
+      info.offset.x < -110 || info.velocity.x < -600
+        ? ADD
+        : info.offset.x > 110 || info.velocity.x > 600
+          ? SKIP
+          : 0;
     if (!go) {
       animate(x, 0, { type: 'spring', stiffness: 300, damping: 26 });
       return;
@@ -512,16 +517,15 @@ function Draggable({
       transition={{ duration: 0.3, ease: EASE }}
     >
       <CardView card={card} />
-      {/* Stamps: ADD when dragging left (toward My list), SKIP when dragging right */}
       <motion.span
         style={{ opacity: addStamp }}
-        className="pointer-events-none absolute top-6 right-5 rotate-12 rounded-[12px] border-4 border-window px-3 py-1 text-[22px] font-extrabold text-window"
+        className="pointer-events-none absolute top-6 right-5 z-10 rotate-12 rounded-[12px] border-4 border-window px-3 py-1 text-[22px] font-extrabold text-window"
       >
         ADD
       </motion.span>
       <motion.span
         style={{ opacity: skipStamp }}
-        className="pointer-events-none absolute top-6 left-5 -rotate-12 rounded-[12px] border-4 border-bad px-3 py-1 text-[22px] font-extrabold text-bad"
+        className="pointer-events-none absolute top-6 left-5 z-10 -rotate-12 rounded-[12px] border-4 border-bad px-3 py-1 text-[22px] font-extrabold text-bad"
       >
         SKIP
       </motion.span>
@@ -530,25 +534,114 @@ function Draggable({
 }
 
 function CardView({ card, under }: { card: SwipeCard; under?: boolean }) {
+  const photos = card.gallery?.length ? card.gallery : [card.image];
+  const [photoI, setPhotoI] = useState(0);
+  const [lightbox, setLightbox] = useState(false);
+  const src = photos[photoI] ?? card.image;
+
+  const prev = (e?: { stopPropagation: () => void; preventDefault: () => void }) => {
+    e?.stopPropagation();
+    e?.preventDefault();
+    setPhotoI((i) => (i - 1 + photos.length) % photos.length);
+  };
+  const next = (e?: { stopPropagation: () => void; preventDefault: () => void }) => {
+    e?.stopPropagation();
+    e?.preventDefault();
+    setPhotoI((i) => (i + 1) % photos.length);
+  };
+
   return (
     <article
       className={`absolute inset-0 flex flex-col overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-float)] ${under ? 'translate-y-3 scale-[0.95] opacity-60' : ''}`}
       aria-hidden={under}
     >
-      <div className="relative h-[180px] w-full shrink-0 bg-raised">
+      <div className="relative h-[240px] w-full shrink-0 bg-raised sm:h-[260px]">
         <Image
-          src={card.image}
-          alt=""
+          src={src}
+          alt={`${card.title} photo ${photoI + 1}`}
           fill
           className="object-cover"
           sizes="(max-width: 480px) 100vw, 480px"
           priority={!under}
+          unoptimized={src.startsWith('http')}
         />
         <span className="absolute top-3 right-3 rounded-full bg-ink/70 px-2 py-0.5 text-[12px] font-bold text-chalk">
           Example
         </span>
+        {!under && photos.length > 1 && (
+          <>
+            <button
+              type="button"
+              aria-label="Previous photo"
+              onPointerDownCapture={(e) => e.stopPropagation()}
+              onClick={prev}
+              className="absolute top-1/2 left-2 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-ink/65 text-chalk hover:bg-ink/85"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              type="button"
+              aria-label="Next photo"
+              onPointerDownCapture={(e) => e.stopPropagation()}
+              onClick={next}
+              className="absolute top-1/2 right-2 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-ink/65 text-chalk hover:bg-ink/85"
+            >
+              <ChevronRight size={18} />
+            </button>
+            <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
+              {photos.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  aria-label={`Photo ${i + 1}`}
+                  onPointerDownCapture={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPhotoI(i);
+                  }}
+                  className={`h-1.5 rounded-full transition ${i === photoI ? 'w-5 bg-chalk' : 'w-1.5 bg-chalk/40'}`}
+                />
+              ))}
+            </div>
+          </>
+        )}
+        {!under && (
+          <button
+            type="button"
+            aria-label="View photos larger"
+            onPointerDownCapture={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              setLightbox(true);
+            }}
+            className="absolute bottom-3 right-3 flex items-center gap-1 rounded-full bg-ink/70 px-2.5 py-1 text-[11px] font-bold text-chalk hover:bg-ink/90"
+          >
+            <Maximize2 size={12} aria-hidden /> View
+          </button>
+        )}
       </div>
-      <div className="flex flex-1 flex-col p-4">
+
+      {!under && !lightbox && photos.length > 1 && (
+        <div
+          className="flex gap-1.5 overflow-x-auto border-b border-line bg-raised/40 px-3 py-2"
+          onPointerDownCapture={(e) => e.stopPropagation()}
+        >
+          {photos.map((p, i) => (
+            <button
+              key={`${p}-${i}`}
+              type="button"
+              onClick={() => setPhotoI(i)}
+              className={`relative h-12 w-16 shrink-0 overflow-hidden rounded-lg border-2 ${
+                i === photoI ? 'border-window' : 'border-transparent opacity-80'
+              }`}
+            >
+              <Image src={p} alt="" fill className="object-cover" sizes="64px" unoptimized={p.startsWith('http')} />
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4">
         <div className="flex items-start justify-between gap-2">
           <div>
             <h2 className="text-[22px] leading-7 font-extrabold">{card.title}</h2>
@@ -570,9 +663,7 @@ function CardView({ card, under }: { card: SwipeCard; under?: boolean }) {
           Rent &amp; deposit — Caller confirms on the phone (we don&apos;t guess).
         </p>
         <ul className="mt-3 flex flex-wrap gap-2 text-[13px] leading-4 font-bold">
-          <li className="flex items-center gap-1.5 rounded-full bg-raised px-3 py-1.5">
-            {card.unitType}
-          </li>
+          <li className="flex items-center gap-1.5 rounded-full bg-raised px-3 py-1.5">{card.unitType}</li>
           {card.walkMin !== undefined && (
             <li className="flex items-center gap-1.5 rounded-full bg-raised px-3 py-1.5">
               <Footprints size={14} aria-hidden /> {card.walkMin} min walk to Scianna Hall
@@ -592,11 +683,115 @@ function CardView({ card, under }: { card: SwipeCard; under?: boolean }) {
           Source <ExternalLink size={12} aria-hidden />
         </a>
       </div>
+
+      {lightbox && !under && (
+        <PhotoLightbox
+          title={card.title}
+          photos={photos}
+          index={photoI}
+          onIndex={setPhotoI}
+          onClose={() => setLightbox(false)}
+        />
+      )}
     </article>
   );
 }
 
-/** A little paper file that flies from Scout toward the team panel on every yes. */
+function PhotoLightbox({
+  title,
+  photos,
+  index,
+  onIndex,
+  onClose,
+}: {
+  title: string;
+  photos: string[];
+  index: number;
+  onIndex: (i: number) => void;
+  onClose: () => void;
+}) {
+  const src = photos[index] ?? photos[0]!;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft') onIndex((index - 1 + photos.length) % photos.length);
+      if (e.key === 'ArrowRight') onIndex((index + 1) % photos.length);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [index, onClose, onIndex, photos.length]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[90] flex flex-col bg-ink/92 backdrop-blur-sm"
+      onPointerDownCapture={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-modal
+      aria-label={`${title} photos`}
+    >
+      <div className="flex items-center justify-between px-4 py-3">
+        <p className="font-bold">
+          {title}{' '}
+          <span className="text-text-3">
+            · {index + 1}/{photos.length}
+          </span>
+        </p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="grid size-10 place-items-center rounded-full border border-line hover:bg-raised"
+          aria-label="Close"
+        >
+          <X size={18} />
+        </button>
+      </div>
+      <div className="relative mx-auto flex min-h-0 w-full max-w-3xl flex-1 items-center px-4 pb-6">
+        <button
+          type="button"
+          aria-label="Previous"
+          onClick={() => onIndex((index - 1 + photos.length) % photos.length)}
+          className="absolute left-2 z-10 grid size-11 place-items-center rounded-full bg-surface/90 border border-line"
+        >
+          <ChevronLeft size={22} />
+        </button>
+        <div className="relative mx-auto aspect-[4/3] w-full overflow-hidden rounded-[20px] border border-line bg-raised">
+          <Image
+            src={src}
+            alt=""
+            fill
+            className="object-contain"
+            sizes="100vw"
+            unoptimized={src.startsWith('http')}
+            priority
+          />
+        </div>
+        <button
+          type="button"
+          aria-label="Next"
+          onClick={() => onIndex((index + 1) % photos.length)}
+          className="absolute right-2 z-10 grid size-11 place-items-center rounded-full bg-surface/90 border border-line"
+        >
+          <ChevronRight size={22} />
+        </button>
+      </div>
+      <div className="flex justify-center gap-2 overflow-x-auto px-4 pb-6">
+        {photos.map((p, i) => (
+          <button
+            key={`${p}-${i}`}
+            type="button"
+            onClick={() => onIndex(i)}
+            className={`relative h-14 w-20 shrink-0 overflow-hidden rounded-xl border-2 ${
+              i === index ? 'border-window' : 'border-line opacity-70'
+            }`}
+          >
+            <Image src={p} alt="" fill className="object-cover" sizes="80px" unoptimized={p.startsWith('http')} />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Toss({ active, reduced }: { active: boolean; reduced: boolean }) {
   if (!active || reduced) return null;
   return (
@@ -610,7 +805,6 @@ function Toss({ active, reduced }: { active: boolean; reduced: boolean }) {
   );
 }
 
-/** ← / → keys decide, like the buttons. */
 function KeyboardSwipe({ enabled, onDecide }: { enabled: boolean; onDecide: (yes: boolean) => void }) {
   const cb = useRef(onDecide);
   useEffect(() => {

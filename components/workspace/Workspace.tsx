@@ -23,6 +23,7 @@ import {
   PhoneOutgoing,
   Trash2,
   Upload,
+  Users,
   Voicemail,
 } from 'lucide-react';
 import { api } from '@/convex/_generated/api';
@@ -113,6 +114,7 @@ function cardFromInterest(row: {
     sourceUrl: seed?.sourceUrl ?? '#',
     pitch: seed?.pitch ?? row.placeTitle,
     image: seed?.image ?? '/places/oak-hollow.jpg',
+    gallery: seed?.gallery ?? [seed?.image ?? '/places/oak-hollow.jpg'],
     hue: 160,
   };
 }
@@ -772,6 +774,16 @@ function MyList({
 }) {
   return (
     <aside aria-label="My list" className="order-2 flex min-h-0 flex-col lg:order-none">
+      <Link
+        href="/app/roommates"
+        className="mb-3 flex items-center gap-2 rounded-[16px] border border-line bg-surface px-3 py-2.5 text-[13px] font-bold hover:border-window/50 hover:bg-window-dim/30"
+      >
+        <Users size={15} className="text-window" aria-hidden />
+        Roommate Space
+        <span className="ml-auto rounded-full bg-raised px-2 py-0.5 text-[11px] font-bold text-text-3">
+          Demo
+        </span>
+      </Link>
       <div className="flex items-baseline justify-between">
         <h2 className="text-[18px] leading-6 font-bold">My list</h2>
         <span className="text-[13px] text-text-3">

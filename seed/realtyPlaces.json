@@ -15,7 +15,12 @@
       "sourceUrl": "https://oakhollow.example/1-bed",
       "pitch": "They take an I-20 instead of an SSN!",
       "image": "/places/oak-hollow.jpg",
-      "imageFallback": "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&q=80"
+      "gallery": [
+        "/places/oak-hollow.jpg",
+        "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=1200&q=80",
+        "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=1200&q=80",
+        "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=1200&q=80"
+      ]
     },
     {
       "slug": "pine-row-1bd",
@@ -31,7 +36,12 @@
       "sourceUrl": "https://pinerow.example/floorplans",
       "pitch": "Quiet street near campus — ask Caller for today’s rent.",
       "image": "/places/pine-row.jpg",
-      "imageFallback": "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80"
+      "gallery": [
+        "/places/pine-row.jpg",
+        "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&q=80",
+        "https://images.unsplash.com/photo-1484154218962-a197022b5858?w=1200&q=80",
+        "https://images.unsplash.com/photo-1560185127-6ed189bf02f4?w=1200&q=80"
+      ]
     },
     {
       "slug": "magnolia-court-studio",
@@ -47,7 +57,12 @@
       "sourceUrl": "https://magnoliacourt.example/studios",
       "pitch": "Only 6 min walk to class!",
       "image": "/places/magnolia-court.jpg",
-      "imageFallback": "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&q=80"
+      "gallery": [
+        "/places/magnolia-court.jpg",
+        "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=1200&q=80",
+        "https://images.unsplash.com/photo-1560448204-603b3fc33ddc?w=1200&q=80",
+        "https://images.unsplash.com/photo-1554995207-c18c203606cb?w=1200&q=80"
+      ]
     },
     {
       "slug": "willow-park-1bd",
@@ -63,7 +78,12 @@
       "sourceUrl": "https://willowpark.example/units",
       "pitch": "Close to campus — Caller will confirm rent live.",
       "image": "/places/willow-park.jpg",
-      "imageFallback": "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=800&q=80"
+      "gallery": [
+        "/places/willow-park.jpg",
+        "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=1200&q=80",
+        "https://images.unsplash.com/photo-1560184897-ae75f418493e?w=1200&q=80",
+        "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=1200&q=80"
+      ]
     },
     {
       "slug": "cedar-flats-room",
@@ -79,7 +99,12 @@
       "sourceUrl": "https://cedarflats.example/rooms",
       "pitch": "Shared 2-bed option — ask Caller what a room costs now.",
       "image": "/places/cedar-flats.jpg",
-      "imageFallback": "https://images.unsplash.com/photo-1484154218962-a197022b5858?w=800&q=80"
+      "gallery": [
+        "/places/cedar-flats.jpg",
+        "https://images.unsplash.com/photo-1484154218962-a197022b5858?w=1200&q=80",
+        "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=1200&q=80",
+        "https://images.unsplash.com/photo-1630699144867-37acec97df5a?w=1200&q=80"
+      ]
     },
     {
       "slug": "birch-lane-1bd",
@@ -95,7 +120,54 @@
       "sourceUrl": "https://birchlane.example",
       "pitch": "Quiet street, bigger 1 bed.",
       "image": "/places/birch-lane.jpg",
-      "imageFallback": "https://images.unsplash.com/photo-1560185127-6ed189bf02f4?w=800&q=80"
+      "gallery": [
+        "/places/birch-lane.jpg",
+        "https://images.unsplash.com/photo-1560185127-6ed189bf02f4?w=1200&q=80",
+        "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200&q=80",
+        "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80"
+      ]
+    },
+    {
+      "slug": "campus-view-2bd",
+      "title": "Campus View Lofts",
+      "address": "301 S 38th Ave, Hattiesburg, MS",
+      "unitType": "2 bed",
+      "rent": 980,
+      "deposit": 500,
+      "walkMin": 11,
+      "noSSN": "I-20 + guarantor letter OK",
+      "officeName": "Campus View Leasing",
+      "availableFrom": "2027-08-08",
+      "sourceUrl": "https://campusview.example/2bed",
+      "pitch": "2-bed loft — great for roommate splits.",
+      "image": "/places/oak-hollow.jpg",
+      "gallery": [
+        "/places/oak-hollow.jpg",
+        "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1200&q=80",
+        "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=1200&q=80",
+        "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=1200&q=80"
+      ]
+    },
+    {
+      "slug": "hardy-street-studio",
+      "title": "Hardy Street Studios",
+      "address": "4500 Hardy St, Hattiesburg, MS",
+      "unitType": "Studio",
+      "rent": 695,
+      "deposit": 350,
+      "walkMin": 12,
+      "noSSN": "Passport + proof of funds accepted",
+      "officeName": "Hardy Street Leasing",
+      "availableFrom": "2027-07-28",
+      "sourceUrl": "https://hardystreet.example/studios",
+      "pitch": "Bright studio on the Hardy corridor.",
+      "image": "/places/magnolia-court.jpg",
+      "gallery": [
+        "/places/magnolia-court.jpg",
+        "https://images.unsplash.com/photo-1600047509807-ba8f99d2cdbc?w=1200&q=80",
+        "https://images.unsplash.com/photo-1600573472592-401b489a3cdc?w=1200&q=80",
+        "https://images.unsplash.com/photo-1616594039964-ae9021a400a0?w=1200&q=80"
+      ]
     }
   ]
 }

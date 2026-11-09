@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Heart, Mic, Phone, Search, Shrink, Sparkles } from 'lucide-react';
+import { Heart, Mic, Phone, Search, Shrink, Sparkles, Users } from 'lucide-react';
 import { WorldProvider } from '@/components/world/WorldContext';
 import type { WorldHandle } from '@/components/world/World';
 import type { FocusTarget } from '@/components/world/cameraRig';
@@ -138,6 +138,12 @@ export function TeamHome() {
                 className={buttonClass('secondary', 'min-h-[52px] rounded-[16px] sm:w-auto sm:px-6')}
               >
                 <Heart size={18} aria-hidden /> My places
+              </Link>
+              <Link
+                href="/app/roommates"
+                className={buttonClass('secondary', 'min-h-[52px] rounded-[16px] sm:w-auto sm:px-6')}
+              >
+                <Users size={18} aria-hidden /> Roommate Space
               </Link>
               <button
                 onClick={() => setAskOpen(true)}
